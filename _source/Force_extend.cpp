@@ -180,9 +180,9 @@ bool Trajectory::turn_c(const vector<float> &L_theta, const vector<float> &bound
 		return result;
 
 	float alfa, l1, l2, l3, x2, y2, alfa_tmp, l1_tmp, l2_tmp, l3_tmp, x2_tmp, y2_tmp;
-	float step = 0.1;
-	float exceed_allow_x = 3;
-	float exceed_allow_y = 5;
+	float step = 0.1f;
+	float exceed_allow_x = 3.f;
+	float exceed_allow_y = 5.f;
 	for (auto a = L_theta.begin(); a != L_theta.end() - 4; a += 2)
 	{
 		if (thetag == PI / 4)
@@ -464,8 +464,8 @@ int Trajectory::is_force_extend_safe(const Vehicle::Node &startnode, const float
 	ctrl_points[0] = control[0] + startnode.x;				ctrl_points[1] = control[1] + startnode.y;
 	for (int i = 2; i < ctrl_points.size(); i += 4)
 	{
-		ctrl_points[i] = 0.5*(control[1 + i / 2] + control[i / 2 - 1]) + startnode.x;
-		ctrl_points[i + 1] = 0.5*(control[2 + i / 2] + control[i / 2]) + startnode.y;
+		ctrl_points[i] = 0.5f*(control[1 + i / 2] + control[i / 2 - 1]) + startnode.x;
+		ctrl_points[i + 1] = 0.5f*(control[2 + i / 2] + control[i / 2]) + startnode.y;
 		ctrl_points[i + 2] = control[1 + i / 2] + startnode.x;
 		ctrl_points[i + 3] = control[2 + i / 2] + startnode.y;
 	}

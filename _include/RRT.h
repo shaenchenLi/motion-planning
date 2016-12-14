@@ -14,14 +14,16 @@ using Vector5f = Matrix<float, 5, 1>;
 using Vector6f = Matrix<float, 6, 1>;
 
 #include "Collision_check.h"
-#include "Vehicle.hpp"
 #include "Force_Extend.h"
+#include "Trajectory.h"
+#include "Vehicle.hpp"
 
 namespace RRT
 {
 	struct RRT_Node;
 
 	using Index = vector<RRT_Node>::size_type;
+	using DIS_TO_NODE = std::map<float, Index>;
 
 	const int dim = 2;
 
@@ -109,16 +111,26 @@ namespace RRT
 			delete tree, route_tree;
 		}
 
+		// NN_search
+		void kd_insert(RRT_Node *new_node, const Index &insert_index); //insert
+		void kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN);
+		int kNN_add(const Vehicle::Node &node, const Index &add_tmp, DIS_TO_NODE *kNN);//1：插入成功 2：插入但未成功 3：不能插入
+		void nearest_search(const Vehicle::Node &node, Index* near_node);  //virtual
+
+		// random select
 		void rand_select(Vehicle::Node *rand_node, const int &iter); //virtual
-		void kd_tree(Index* kd_father, const Vehicle::Node &node); //recursive 
-		void kd_tree(RRT_Node *new_node, const Index &insert_index); //insert
-		void nearest_search(Index* near_node, const Vehicle::Node &node);  //virtual
-		int grow(Vehicle::Node *new_node, Collision::collision *collimap); //2:success 1:partially extension 0:failure
-		int search(Collision::collision *collimap, vector<float> *L_theta, const float l = 0, const float w = 0, const float r = 0); //virtual
 		void _lambda_ss(float *lambda, const int &num, const float le = 0.f); //le=0:unextendable  le!=0:extendable
-		void path2tree(const Index &predecessor, vector<Vehicle::Node> *path);
+
+		// template path generate
 		int force_extend(vector<float> *L_theta, Collision::collision *collimap, float *le);//2:success 1:partially extension 0:failure
 		int force_extend(const float &l, const float &w, const float &r, vector<float> *L_theta, Collision::collision *collimap, float *le);
+		void path2tree(const Index &predecessor, vector<Vehicle::Node> *path);
+
+		// grow of tree
+		int grow(Vehicle::Node *new_node, Collision::collision *collimap); //2:success 1:partially extension 0:failure
+		int search(Collision::collision *collimap, vector<float> *L_theta, const float l = 0, const float w = 0, const float r = 0); //virtual
+
+		// get final path 
 		void getpath();
 
 		vector<RRT_Node>* _tree() { return tree; }

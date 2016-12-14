@@ -1,60 +1,250 @@
 #include "RRT.h"
 
-void RRT::RTG_RRT::kd_tree(Index* kd_father, const Vehicle::Node &new_node)
+void RRT::RTG_RRT::kd_insert(RRT_Node *new_node, const Index &insert_index)
 {
-	*kd_father = 0;
-	Index old = 0;
- 	while (*kd_father != max_size+1)
+	Index curr = 0;
+	int flag = 0;
+
+	while (flag == 0)
 	{
-		old = *kd_father;
-		switch ((*tree)[*kd_father]._deep())
+		switch ((*tree)[curr]._deep())
 		{
 		case 0:
-			if (norm(new_node.x, XMAX, XMIN) > norm((*tree)[*kd_father]._node()->x, XMAX, XMIN))
-				*kd_father = (*tree)[*kd_father]._right();
+			if (norm(new_node->_node()->x, XMAX, XMIN) > norm((*tree)[curr]._node()->x, XMAX, XMIN))
+			{
+				if ((*tree)[curr]._right() != max_size + 1)
+					curr = (*tree)[curr]._right();
+				else
+				{
+					(*tree)[curr]._right(new_node->_index());
+					flag = 1;
+				}
+			}
 			else
-				*kd_father = (*tree)[*kd_father]._left();
+			{
+				if ((*tree)[curr]._left() != max_size + 1)
+					curr = (*tree)[curr]._left();
+				else
+				{
+					(*tree)[curr]._left(new_node->_index());
+					flag = 1;
+				}
+			}
 			break;
 		case 1:
-			if (norm(new_node.y, dest->_node()->y, 0) > norm((*tree)[*kd_father]._node()->y, dest->_node()->y, 0))
-				*kd_father = (*tree)[*kd_father]._right();
+			if (norm(new_node->_node()->y, dest->_node()->y, 0) > norm((*tree)[insert_index]._node()->y, dest->_node()->y, 0))
+			{
+				if ((*tree)[curr]._right() != max_size + 1)
+					curr = (*tree)[curr]._right();
+				else
+				{
+					(*tree)[curr]._right(new_node->_index());
+					flag = 1;
+				}
+			}
 			else
-				*kd_father = (*tree)[*kd_father]._left();
+			{
+				if ((*tree)[curr]._left() != max_size + 1)
+					curr = (*tree)[curr]._left();
+				else
+				{
+					(*tree)[curr]._left(new_node->_index());
+					flag = 1;
+				}
+			}
 			break;
 		}
 	}
-	*kd_father = old;
+
+	new_node->_kd_father(curr);
+	new_node->_deep((*tree)[curr]._deep() + 1);
 }
 
-void RRT::RTG_RRT::kd_tree(RRT_Node *new_node, const Index &insert_index) 
+int RRT::RTG_RRT::kNN_add(const Vehicle::Node &node, const Index &add_tmp, DIS_TO_NODE *kNN)
 {
-	new_node->_kd_father(insert_index);
-
-	switch ((*tree)[insert_index]._deep())
-	{
-	case 0:
-		if (norm(new_node->_node()->x, XMAX, XMIN) > norm((*tree)[insert_index]._node()->x, XMAX, XMIN))
-			(*tree)[insert_index]._right(new_node->_index());
-		else
-			(*tree)[insert_index]._left(new_node->_index());
-		break;
-	case 1:
-		if (norm(new_node->_node()->y, dest->_node()->y, 0) > norm((*tree)[insert_index]._node()->y, dest->_node()->y, 0))
-			(*tree)[insert_index]._right(new_node->_index());
-		else
-			(*tree)[insert_index]._left(new_node->_index());
-		break;
-	}
-
-	new_node->_deep((*tree)[insert_index]._deep() + 1);
-}
-
-void RRT::RTG_RRT::nearest_search(Index* near_node, const Vehicle::Node &node)
-{
-	if (!tree->empty())
-		kd_tree(near_node, node);
+	bool result;
+	if (kNN->size() < kNN_NUM)
+		result = kNN->insert({ Trajectory::dist(node, *(*tree)[add_tmp]._node()), add_tmp }).second;
 	else
-		*near_node = HUGE_VAL;
+	{
+		float dist_tmp = Trajectory::dist(node, *(*tree)[add_tmp]._node());
+		if (dist_tmp < kNN->rbegin()->second)
+		{
+			kNN->erase(kNN->rbegin()->first);
+			result = kNN->insert({ dist_tmp, add_tmp }).second;
+		}
+		else
+			return -1;
+	}
+	if (result == true)
+		return 1;
+	else
+		return 0;
+}
+
+void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
+{
+	DIS_TO_NODE *BPQ = new DIS_TO_NODE;
+	std::set<Index> *BPQ_old = new std::set<Index>;
+
+	Index curr = 0;
+	int bt_num = 0;
+	while (1)
+	{
+		Index old = 0;
+		while (curr != max_size + 1)
+		{
+			old = curr;
+			switch ((*tree)[curr]._deep())
+			{
+			case 0:
+				if (norm(node.x, XMAX, XMIN) > norm((*tree)[curr]._node()->x, XMAX, XMIN))
+				{
+					old = curr;
+					curr = (*tree)[curr]._right();
+				}
+				else
+				{
+					old = curr;
+					curr = (*tree)[curr]._left();
+				}
+				break;
+			case 1:
+				if (norm(node.y, dest->_node()->y, 0) > norm((*tree)[curr]._node()->y, dest->_node()->y, 0))
+				{
+					old = curr;
+					curr = (*tree)[curr]._right();
+				}
+				else
+				{
+					old = curr;
+					curr = (*tree)[curr]._left();
+				}
+				break;
+			}
+
+			if (BPQ_old->find(old) == BPQ_old->end())
+				BPQ->insert({ Trajectory::dist(node, *(*tree)[old]._node()), old });//避免重复插入BPQ
+		}
+		curr = old;	//正向搜索最邻近点		
+
+		float dis_spilt;
+		switch (kNN_add(node, curr, kNN))
+		{
+		case 1: case -1:
+			if ((*tree)[curr]._deep() == 0)
+				dis_spilt = abs((*tree)[curr]._node()->x - node.x);
+			else
+				dis_spilt = abs((*tree)[curr]._node()->y - node.y);
+			break;
+		case 0:
+			Index spilt_node = kNN->find(Trajectory::dist(node, *(*tree)[curr]._node()))->second;
+			if (spilt_node == 0)
+				dis_spilt = abs((*tree)[spilt_node]._node()->x - node.x);
+			else
+				dis_spilt = abs((*tree)[spilt_node]._node()->y - node.y);
+			break;
+		}
+		if (kNN->rbegin()->first > dis_spilt || kNN->size() < kNN_NUM)
+		{
+			if (bt_num < BT_MAX)
+			{
+				while (!BPQ->empty())
+				{
+					curr = BPQ->begin()->second;
+					Index tmp = curr;
+					BPQ->erase(BPQ->begin());
+					BPQ_old->insert(curr);
+
+					switch ((*tree)[curr]._deep()) //判断另一侧是否有结点从而判断是否需要回溯
+					{
+					case 0:
+						if (norm(node.x, XMAX, XMIN) < norm((*tree)[curr]._node()->x, XMAX, XMIN))
+						{
+							curr = (*tree)[curr]._right();
+							if (curr == max_size + 1)
+							{
+								curr = tmp;
+								kNN_add(node, curr, kNN);
+								break;
+							}
+							else
+								kNN_add(node, tmp, kNN);
+						}
+						else
+						{
+							curr = (*tree)[curr]._left();
+							if (curr == max_size + 1)
+							{
+								curr = tmp;
+								kNN_add(node, curr, kNN);
+								break;
+							}
+							else
+								kNN_add(node, tmp, kNN);
+						}
+						break;
+					case 1:
+						if (norm(node.y, dest->_node()->y, 0) < norm((*tree)[curr]._node()->y, dest->_node()->y, 0))
+						{
+							curr = (*tree)[curr]._right();
+							if (curr == max_size + 1)
+							{
+								curr = tmp;
+								kNN_add(node, curr, kNN);
+								break;
+							}
+							else
+								kNN_add(node, tmp, kNN);
+						}
+						else
+						{
+							curr = (*tree)[curr]._left();
+							if (curr == max_size + 1)
+							{
+								curr = tmp;
+								kNN_add(node, curr, kNN);
+								break;
+							}
+							else
+								kNN_add(node, tmp, kNN);
+						}
+						break;
+					}
+
+					if (tmp == curr)
+						continue;
+					else
+						break;
+				}
+
+				if (BPQ->empty() && (curr == 0 || curr == old))
+					break;
+			}
+			else
+				break;
+		}
+	}
+	delete BPQ, BPQ_old;
+}
+
+void RRT::RTG_RRT::nearest_search(const Vehicle::Node &node, Index* near_node)
+{
+	DIS_TO_NODE *kNN = new DIS_TO_NODE;
+	kNN_search(node, kNN);
+
+	Index near_node_tmp;
+	float min_dist = 1000;
+	for (auto &i : *kNN)
+	{
+		float dist = i.first;
+		if (dist < min_dist)
+		{
+			min_dist = dist;
+			near_node_tmp = i.second;
+		}
+	}
+	*near_node = near_node_tmp;
 }
 
 void RRT::RTG_RRT::rand_select(Vehicle::Node *rand_node, const int &iter)
@@ -72,7 +262,7 @@ int RRT::RTG_RRT::grow(Vehicle::Node *new_node, Collision::collision *collimap)
 	int result = 0;
 
 	Index near_node_index;
-	nearest_search(&near_node_index, *new_node);
+	nearest_search(*new_node, &near_node_index);
 
 	float delta = atan2f(new_node->y - (*tree)[near_node_index]._node()->y, new_node->x - (*tree)[near_node_index]._node()->x);
 	new_node->reset((*tree)[near_node_index]._node()->x + step*cos(delta), (*tree)[near_node_index]._node()->y + step*sin(delta), delta);
@@ -85,7 +275,7 @@ int RRT::RTG_RRT::grow(Vehicle::Node *new_node, Collision::collision *collimap)
 			dest->_index(tree->size());
 			(*tree)[near_node_index]._successor(dest->_index());
 			dest->_predecessor(near_node_index);
-			kd_tree(dest, near_node_index);
+			kd_insert(dest, near_node_index);
 			tree->push_back(dest);
 			result = 2;
 			root = &(*tree)[0];
@@ -98,7 +288,7 @@ int RRT::RTG_RRT::grow(Vehicle::Node *new_node, Collision::collision *collimap)
 			Index new_index = tree->size();
 			tree->emplace_back(*new_node, new_index, near_node_index, max_size + 1);
 			(*tree)[near_node_index]._successor(new_index);
-			kd_tree(&(*tree)[new_index], near_node_index);
+			kd_insert(&(*tree)[new_index], near_node_index);
 			result = 1;
 		}
 	}
@@ -189,7 +379,7 @@ int RRT::RTG_RRT::search(Collision::collision *collimap, vector<float> *L_theta,
 int RRT::RTG_RRT::force_extend(vector<float> *L_theta, Collision::collision *collimap, float *le)
 {
 	Index near_node_index;
-	nearest_search(&near_node_index, dest->_node());
+	nearest_search(dest->_node(), &near_node_index);
 
 	Vehicle::Node startnode = (*tree)[near_node_index]._node();
 	
@@ -231,7 +421,7 @@ int RRT::RTG_RRT::force_extend(vector<float> *L_theta, Collision::collision *col
 int RRT::RTG_RRT::force_extend(const float &l, const float &w, const float &r, vector<float> *L_theta, Collision::collision *collimap, float *le)
 {
 	Index near_node_index;
-	nearest_search(&near_node_index, dest->_node());
+	nearest_search(dest->_node(), &near_node_index);
 
 	Vehicle::Node startnode = (*tree)[near_node_index]._node();
 	Vehicle::Node endnode = Vehicle::Node(dest->_node()->x - startnode.x, dest->_node()->y - startnode.y, dest->_node()->theta - startnode.theta);

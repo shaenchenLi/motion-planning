@@ -6,6 +6,8 @@
 #define RRTSTEP_l 8.f //两种不同的RRTSTEP可以选择以提高效率
 #define MAXITER 1000
 #define SAFESTEP 2.f //max(L_F_BA, interval of environment)
+#define kNN_NUM 5 //kNN个数
+#define BT_MAX 10 //最大回溯次数
 
 /************************************Vehicle Parameters***********************************/
 #define PI 3.1415926535898f

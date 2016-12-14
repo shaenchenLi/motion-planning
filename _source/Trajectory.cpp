@@ -307,8 +307,8 @@ void Trajectory::traj::_bspline(const vector<Vehicle::Node> &route_tree)
 	ctrlp[0] = route_tree.begin()->x;				ctrlp[1] = route_tree.begin()->y;
 	for (int i = 2; i < ctrlp.size(); i += 4)
 	{
-		ctrlp[i] = 0.5*(ctrlp[i - 2] + route_tree[0.25*i + 0.5].x);
-		ctrlp[i + 1] = 0.5*(ctrlp[i - 1] + route_tree[0.25*i + 0.5].y);
+		ctrlp[i] = 0.5f*(ctrlp[i - 2] + route_tree[0.25*i + 0.5].x);
+		ctrlp[i + 1] = 0.5f*(ctrlp[i - 1] + route_tree[0.25*i + 0.5].y);
 		ctrlp[i + 2] = route_tree[0.25*i + 0.5].x;
 		ctrlp[i + 3] = route_tree[0.25*i + 0.5].y;
 	}
