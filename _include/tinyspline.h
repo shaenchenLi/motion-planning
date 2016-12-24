@@ -16,7 +16,7 @@ extern "C" {
 #ifdef TINYSPLINE_DOUBLE_PRECISION
 typedef double tsRational;
 #else
-typedef float tsRational;
+typedef double tsRational;
 #endif
 
 

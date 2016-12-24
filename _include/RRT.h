@@ -10,8 +10,8 @@
 
 #include <Dense>
 using namespace Eigen;
-using Vector5f = Matrix<float, 5, 1>;
-using Vector6f = Matrix<float, 6, 1>;
+using Vector5d = Matrix<double, 5, 1>;
+using Vector6d = Matrix<double, 6, 1>;
 
 #include "Collision_check.h"
 #include "Force_Extend.h"
@@ -23,11 +23,11 @@ namespace RRT
 	struct RRT_Node;
 
 	using Index = vector<RRT_Node>::size_type;
-	using DIS_TO_NODE = std::map<float, Index>;
+	using DIS_TO_NODE = std::map<double, Index>;
 
 	const int dim = 2;
 
-	inline float norm(const float &raw, const float &max, const float &min) { return std::fabs((max - raw) / (max - min)); }
+	inline double norm(const double &raw, const double &max, const double &min) { return std::fabs((max - raw) / (max - min)); }
 
 	struct RRT_Node
 	{
@@ -54,13 +54,13 @@ namespace RRT
 			delete successor;
 		}
 
-		void reset_node(float x, float y)
+		void reset_node(double x, double y)
 		{
 			node.x = x;
 			node.y = y;
 		}
-		void reset_node(float x, float y, float theta) { reset_node(x, y); node.theta = theta; }
-		float edge_generate(const Vehicle::Node &node_i, const Vehicle::Node &node_g);
+		void reset_node(double x, double y, double theta) { reset_node(x, y); node.theta = theta; }
+		double edge_generate(const Vehicle::Node &node_i, const Vehicle::Node &node_g);
 
 		//getdata
 		Vehicle::Node* _node() { return &node; }
@@ -119,16 +119,16 @@ namespace RRT
 
 		// random select
 		void rand_select(Vehicle::Node *rand_node, const int &iter); //virtual
-		void _lambda_ss(float *lambda, const int &num, const float le = 0.f); //le=0:unextendable  le!=0:extendable
+		void _lambda_ss(double *lambda, const int &num, const double le = 0.f); //le=0:unextendable  le!=0:extendable
 
 		// template path generate
-		int force_extend(vector<float> *L_theta, Collision::collision *collimap, float *le);//2:success 1:partially extension 0:failure
-		int force_extend(const float &l, const float &w, const float &r, vector<float> *L_theta, Collision::collision *collimap, float *le);
+		int force_extend(vector<double> *L_theta, Collision::collision *collimap, double *le);//2:success 1:partially extension 0:failure
+		int force_extend(const double &l, const double &w, const double &r, vector<double> *L_theta, Collision::collision *collimap, double *le);
 		void path2tree(const Index &predecessor, vector<Vehicle::Node> *path);
 
 		// grow of tree
 		int grow(Vehicle::Node *new_node, Collision::collision *collimap); //2:success 1:partially extension 0:failure
-		int search(Collision::collision *collimap, vector<float> *L_theta, const float l = 0, const float w = 0, const float r = 0); //virtual
+		int search(Collision::collision *collimap, vector<double> *L_theta, const double l = 0, const double w = 0, const double r = 0); //virtual
 
 		// get final path 
 		void getpath();
@@ -140,7 +140,7 @@ namespace RRT
 		RRT_Node *root, *dest;
 		vector<RRT_Node>* tree;
 		vector<Vehicle::Node>* route_tree;
-		float step;
+		double step;
 		int max_size;
 		int flag; //flag=0:basic RRT; flag=1:TG_RRTG_RRTRT
 	};

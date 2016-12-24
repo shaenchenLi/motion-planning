@@ -16,17 +16,17 @@ using namespace Eigen;
 
 namespace Trajectory
 {
-	void norm_theta_2pi(float *theta); //-pi~pi
-	void norm_theta_pi(float *theta);
-	void norm_theta_0_2pi(float *theta);
-	float dist(const Vehicle::Node &n1, const Vehicle::Node &n2);
-	float dist(const float &x1, const float &y1, const float &x2, const float &y2);
-	float dist(const Point2D &p);
+	void norm_theta_2pi(double *theta); //-pi~pi
+	void norm_theta_pi(double *theta);
+	void norm_theta_0_2pi(double *theta);
+	double dist(const Vehicle::Node &n1, const Vehicle::Node &n2);
+	double dist(const double &x1, const double &y1, const double &x2, const double &y2);
+	double dist(const Point2D &p);
 
 	struct State
 	{
 		State() = default;
-		State(const VectorXf &Xi)
+		State(const VectorXd &Xi)
 		{
 			node.x = Xi[0];
 			node.y = Xi[1];
@@ -35,14 +35,14 @@ namespace Trajectory
 			v = Xi[4];
 			s_init = 0;
 		}
-		State(const float &x0, const float &y0, const float &t0, const float &k0)
+		State(const double &x0, const double &y0, const double &t0, const double &k0)
 		{
 			node.x = x0;
 			node.y = y0;
 			node.theta = t0;
 			node.k = k0;
 		}
-		State(const float &x0, const float &y0, const float &t0, const float &k0, const float &s)
+		State(const double &x0, const double &y0, const double &t0, const double &k0, const double &s)
 		{
 			node.x = x0;
 			node.y = y0;
@@ -50,24 +50,24 @@ namespace Trajectory
 			node.k = k0;
 			s_init = s;
 		}
-		State(const float &x0, const float &y0)
+		State(const double &x0, const double &y0)
 		{
 			node.x = x0;
 			node.y = y0;
 		}
-		State(const Vehicle::Node &n, const float &v0, const float &s) :node(n), v(v0), s_init(s) {}
+		State(const Vehicle::Node &n, const double &v0, const double &s) :node(n), v(v0), s_init(s) {}
 		State(const State &s) :node(s.node), v(s.v), s_init(s.s_init) {}
 
 		Vehicle::Node* _node() { return &node; }
-		float _v() const { return v; }
-		float _s_init() const { return s_init; }
-		float _theta() const { return node.theta; }
-		float _k() const { return node.k; }
+		double _v() const { return v; }
+		double _s_init() const { return s_init; }
+		double _theta() const { return node.theta; }
+		double _k() const { return node.k; }
 
-		void _v(const float &v0) { v = v0; }
-		void _theta(const float &t) { node.theta = t; }
-		void _k(const float &k0) { node.k = k0; }
-		void _node(const float &x0, const float &y0, const float &t0, const float &k0)
+		void _v(const double &v0) { v = v0; }
+		void _theta(const double &t) { node.theta = t; }
+		void _k(const double &k0) { node.k = k0; }
+		void _node(const double &x0, const double &y0, const double &t0, const double &k0)
 		{
 			node.x = x0;
 			node.y = y0;
@@ -81,20 +81,20 @@ namespace Trajectory
 			node.theta = n.theta;
 			node.k = n.k;
 		}
-		void _s_init(const float &s) { s_init = s; }
+		void _s_init(const double &s) { s_init = s; }
 
 	private:
 		Vehicle::Node node;
-		float v, s_init;
+		double v, s_init;
 	};
 
 	struct traj
 	{
 		traj()
 		{
- 			knots = { 1.f, 0.7f, 0.7f, 0.4f, 0.4f, 0.1f, 0.1f, 0.f };
+ 			knots = { 1., 0.7, 0.7, 0.4, 0.4, 0.1, 0.1, 0. };
 		}
-		traj(const VectorXf &Xi, const VectorXf &Xg)
+		traj(const VectorXd &Xi, const VectorXd &Xg)
 		{
 			ctrl_points.emplace_back(Xi[0], Xi[1]);
 			knots = { 1., 0. };
@@ -103,7 +103,7 @@ namespace Trajectory
 			v_tmp_dest.emplace_back(Xg[4]);
 			_v_tmp_dest(Xi[5]);
 		}
-		traj(State Xi, State Xg, const float &accel, vector<State> *adjust_states_front)
+		traj(State Xi, State Xg, const double &accel, vector<State> *adjust_states_front)
 		{
 			ctrl_points.emplace_back(Xi._node()->x, Xi._node()->y);
 			knots = { 1., 0. };
@@ -114,12 +114,12 @@ namespace Trajectory
 			state_now = *adjust_states_front;
 		}
 		
-		void _ctrl_points(const vector<Vehicle::Node> &route_tree, vector<float> *L_theta, Collision::collision *collimap);
+		void _ctrl_points(const vector<Vehicle::Node> &route_tree, vector<double> *L_theta, Collision::collision *collimap);
 		void _bspline();
 		void _bspline(const vector<Vehicle::Node> &route_tree);
-		void _state(float *accel, vector<State> *adjust_states_end= nullptr);
-		vector<State>* _state(const float &a0, const float &sg, vector<State> *adjust_states_end); //in practical when sg<state.end-10, calculate state_future
-		void _v_tmp_dest(const float &accel);
+		void _state(double *accel, vector<State> *adjust_states_end= nullptr);
+		vector<State>* _state(const double &a0, const double &sg, vector<State> *adjust_states_end); //in practical when sg<state.end-10, calculate state_future
+		void _v_tmp_dest(const double &accel);
 
 		EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
@@ -129,15 +129,15 @@ namespace Trajectory
 
 	private:		
 		vector<Point2D> ctrl_points;
-		vector<float> v_tmp_dest;
+		vector<double> v_tmp_dest;
 		vector<State> state_now;
 		vector<State> state_future;
-		vector<float> knots; 
+		vector<double> knots; 
 		ts::BSpline bspline;
 		vector<State> bound;		
 	};
 
-	void adjust_k(const VectorXf &x, State *state, vector<State> *adjust_states, const int &flag); // flag=1 0-k  flag=-1 k-0
+	void adjust_k(const VectorXd &x, State *state, vector<State> *adjust_states, const int &flag); // flag=1 0-k  flag=-1 k-0
 } 
 
 #endif

@@ -12,24 +12,24 @@ Mat* Collision::maptoMat(Environment::EnvironMap *environmap)
 		for (int j = 0; j < environmat->cols; j++)
 		{
 			Environment::position pos(environmap->_range()->begin()->x + j*environmap->_interval(), environmap->_range()->begin()->y + i*environmap->_interval());
-			environmat->at<float>(i, j) = (float)((environmap->_environment()->find(pos))->second);
+			environmat->at<float>(i, j) = (double)((environmap->_environment()->find(pos))->second);
 		}
 	}
 	return environmat;
 }
 
-Mat* Collision::collision::_kernel(const float &interval)
+Mat* Collision::collision::_kernel(const double &interval)
 {
-	float radius = sqrt(pow(L, 2) + 9 * pow(W, 2)) / 6;
+	double radius = sqrt(pow(L, 2) + 9 * pow(W, 2)) / 6;
 	int row = (int)std::ceil(radius / interval);
 	Mat* kernel = new Mat(2 * row, 2 * row, CV_32F, Scalar(0));
-	float obs = (float)(1 / (4 * pow(row, 2)));
+	double obs = (double)(1 / (4 * pow(row, 2)));
 
 	for (int i = 0; i < row; i++)
 	{
 		for (int j = 0; j < row; j++)
 		{
-			float y = row*interval - sqrt(pow(radius, 2) - pow((j - row + 1)*interval, 2));
+			double y = row*interval - sqrt(pow(radius, 2) - pow((j - row + 1)*interval, 2));
 			if ((i + 1)*interval>y)
 				kernel->at<float>(i, j) = obs;
 		}
@@ -38,7 +38,7 @@ Mat* Collision::collision::_kernel(const float &interval)
 	{
 		for (int j = row; j < 2 * row; j++)
 		{
-			float y = row*interval - sqrt(pow(radius, 2) - pow((j - row)*interval, 2));
+			double y = row*interval - sqrt(pow(radius, 2) - pow((j - row)*interval, 2));
 			if ((i + 1)*interval>y)
 				kernel->at<float>(i, j) = obs;
 		}
@@ -47,7 +47,7 @@ Mat* Collision::collision::_kernel(const float &interval)
 	{
 		for (int j = 0; j < row; j++)
 		{
-			float y = row*interval + sqrt(pow(radius, 2) - pow((j - row + 1)*interval, 2));
+			double y = row*interval + sqrt(pow(radius, 2) - pow((j - row + 1)*interval, 2));
 			if (i*interval < y)
 				kernel->at<float>(i, j) = obs;
 		}
@@ -56,7 +56,7 @@ Mat* Collision::collision::_kernel(const float &interval)
 	{
 		for (int j = row; j < 2 * row; j++)
 		{
-			float y = row*interval + sqrt(pow(radius, 2) - pow((j - row)*interval, 2));
+			double y = row*interval + sqrt(pow(radius, 2) - pow((j - row)*interval, 2));
 			if (i*interval < y)
 				kernel->at<float>(i, j) = obs;
 		}
@@ -78,22 +78,22 @@ bool Collision::collision::iscollision(const Vehicle::Node &begin_node, const Ve
 {
 	if (iscollision(end_node.x, end_node.y, end_node.theta))
 		return true;
-	float s_total = sqrtf(powf(begin_node.x - end_node.x, 2) + powf(begin_node.y - end_node.y, 2));
-	for (float s = space; s < s_total; s += space)
+	double s_total = sqrt(pow(begin_node.x - end_node.x, 2) + pow(begin_node.y - end_node.y, 2));
+	for (double s = space; s < s_total; s += space)
 	{
-		if (iscollision(begin_node.x + s*cosf(end_node.theta), begin_node.y + s*sinf(end_node.theta), end_node.theta))
+		if (iscollision(begin_node.x + s*cos(end_node.theta), begin_node.y + s*sin(end_node.theta), end_node.theta))
 			return true;
 	}
 	return false;
 }
 
-bool Collision::collision::iscollision(const float &x, const float &y, const float &theta)
+bool Collision::collision::iscollision(const double &x, const double &y, const double &theta)
 {
 	if (Vehicle::is_node_effect(x, y, theta))
 	{
-		std::vector<float> circle(6);
+		std::vector<double> circle(6);
 		std::vector<int> circle_map(6); //circle can be delete in the future
-		float judge[3];
+		double judge[3];
 		for (int i = 0; i < 3; i++)
 		{
 			circle[2 * i] = y + (L / 6 + L*i / 3 - DL)*sin(theta);

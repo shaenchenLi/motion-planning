@@ -12,8 +12,8 @@ namespace Environment
 {
 	struct position
 	{
-		float x, y;
-		position(const float &a, const float &b) :x(a), y(b) {}
+		double x, y;
+		position(const double &a, const double &b) :x(a), y(b) {}
 	};
 
 	struct EnvironMap
@@ -24,7 +24,7 @@ namespace Environment
 		{
 			size_t operator()(const position &p) const
 			{
-				return std::hash<float>()(p.x);
+				return std::hash<double>()(p.x);
 			}
 		};
 
@@ -38,7 +38,7 @@ namespace Environment
 
 		using en_map = unordered_map<position, int, HashFunc, Equal>;
 
-		EnvironMap(const position &xymin, const position &xymax, const float inter = INTERVAL) :interval(inter)
+		EnvironMap(const position &xymin, const position &xymax, const double inter = INTERVAL) :interval(inter)
 		{
 			range = { xymin, xymax };
 			int N_x = (int)std::ceil((xymax.x - xymin.x) / interval);
@@ -59,17 +59,17 @@ namespace Environment
 		void point_construct(const position &point);
 		void vehicle_construct(const position &center, const position &shape);
 		void line_construct(const vector<position> &points); //the interval of points must equal to the map's interval
-		void guard_construct(const vector<position> &points, const float &width);
+		void guard_construct(const vector<position> &points, const double &width);
 		void reset();
 
 		//get data
 		vector<position>* _range() { return &range; }
-		float _interval() const { return interval; }
+		double _interval() const { return interval; }
 		en_map* _environment() { return &environment; }
 
 	private:
 		en_map environment;
-		float interval;
+		double interval;
 		vector<position> range;
 	};
 

@@ -38,18 +38,18 @@ namespace Collision
 		}
 
 		void _collision_map(Environment::EnvironMap *environmap);
-		Mat* _kernel(const float &interval);
+		Mat* _kernel(const double &interval);
 		bool iscollision(const Vehicle::Node &begin_node, const Vehicle::Node &end_node);
-		bool iscollision(const float &x, const float &y, const float &theta);
+		bool iscollision(const double &x, const double &y, const double &theta);
 
 		Mat* _collision_map() { return collision_map; }
 
 	private:
 		Mat* collision_map;
 		Mat* kernel;
-		float interval;
-		float origin[2];
-		float space;
+		double interval;
+		double origin[2];
+		double space;
 	};
 }
 

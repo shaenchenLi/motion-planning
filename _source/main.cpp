@@ -13,7 +13,7 @@ using namespace std::chrono;
 int main()
 {
 	// 生成数组用于确保曲线的曲率
-	vector<float> *L_theta = new vector<float>;
+	vector<double> *L_theta = new vector<double>;
 	Vehicle::ensure_k(L_theta);
 
 	Environment::position xymin(XMIN, YMIN), xymax(XMAX, YMAX);
@@ -22,10 +22,10 @@ int main()
 
 	Collision::collision* collimap = new Collision::collision(&environmap);
 	
-	VectorXf xi(6), xg(5);
-	xi << 0.5f, 0.f, 0.f, 0.f, 4.f, 0.f;
-	xg << 3.5f, 6.85f, -PI, 0.f, 4.f;
-	Vector3f bound;
+	VectorXd xi(6), xg(5);
+	xi << 0.5, 0., 0., 0., 4., 0.;
+	xg << 3.5, 6.85, -PI, 0., 4.;
+	Vector3d bound;
 	bound << xi[4], xi[5], xg[4];
 	Trajectory::State XI(xi);
 	Trajectory::State XG(xg);

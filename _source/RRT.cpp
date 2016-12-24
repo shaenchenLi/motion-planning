@@ -67,7 +67,7 @@ int RRT::RTG_RRT::kNN_add(const Vehicle::Node &node, const Index &add_tmp, DIS_T
 		result = kNN->insert({ Trajectory::dist(node, *(*tree)[add_tmp]._node()), add_tmp }).second;
 	else
 	{
-		float dist_tmp = Trajectory::dist(node, *(*tree)[add_tmp]._node());
+		double dist_tmp = Trajectory::dist(node, *(*tree)[add_tmp]._node());
 		if (dist_tmp < kNN->rbegin()->second)
 		{
 			kNN->erase(kNN->rbegin()->first);
@@ -128,7 +128,7 @@ void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
 		}
 		curr = old;	//正向搜索最邻近点		
 
-		float dis_spilt;
+		double dis_spilt;
 		switch (kNN_add(node, curr, kNN))
 		{
 		case 1: case -1:
@@ -234,10 +234,10 @@ void RRT::RTG_RRT::nearest_search(const Vehicle::Node &node, Index* near_node)
 	kNN_search(node, kNN);
 
 	Index near_node_tmp;
-	float min_dist = 1000;
+	double min_dist = 1000;
 	for (auto &i : *kNN)
 	{
-		float dist = i.first;
+		double dist = i.first;
 		if (dist < min_dist)
 		{
 			min_dist = dist;
@@ -249,9 +249,9 @@ void RRT::RTG_RRT::nearest_search(const Vehicle::Node &node, Index* near_node)
 
 void RRT::RTG_RRT::rand_select(Vehicle::Node *rand_node, const int &iter)
 {
-	std::uniform_real_distribution<float> rand_x, rand_y;
-	rand_x = std::uniform_real_distribution<float>(XMIN, XMAX);
-	rand_y = std::uniform_real_distribution<float>(YMIN, YMAX);
+	std::uniform_real_distribution<double> rand_x, rand_y;
+	rand_x = std::uniform_real_distribution<double>(XMIN, XMAX);
+	rand_y = std::uniform_real_distribution<double>(YMIN, YMAX);
 	std::default_random_engine e(iter*time(0));
 
 	*rand_node = Vehicle::Node(rand_x(e), rand_y(e), 0, 0);
@@ -264,7 +264,7 @@ int RRT::RTG_RRT::grow(Vehicle::Node *new_node, Collision::collision *collimap)
 	Index near_node_index;
 	nearest_search(*new_node, &near_node_index);
 
-	float delta = atan2f(new_node->y - (*tree)[near_node_index]._node()->y, new_node->x - (*tree)[near_node_index]._node()->x);
+	double delta = atan2(new_node->y - (*tree)[near_node_index]._node()->y, new_node->x - (*tree)[near_node_index]._node()->x);
 	new_node->reset((*tree)[near_node_index]._node()->x + step*cos(delta), (*tree)[near_node_index]._node()->y + step*sin(delta), delta);
 
 	if (new_node->x >= dest->_node()->x - 1 && new_node->x <= dest->_node()->x + 1 && new_node->y >= dest->_node()->y - 1 && new_node->y <= dest->_node()->y + 1)
@@ -316,9 +316,9 @@ void RRT::RTG_RRT::path2tree(const Index &predecessor, vector<Vehicle::Node> *pa
 	}
 }
 
-int RRT::RTG_RRT::search(Collision::collision *collimap, vector<float> *L_theta, const float l, const float w, const float r)
+int RRT::RTG_RRT::search(Collision::collision *collimap, vector<double> *L_theta, const double l, const double w, const double r)
 {
-	float le = 0;
+	double le = 0;
 	if (l == 0 && w == 0 && r == 0)
 	{
 		if (force_extend(L_theta, collimap, &le) == 2)
@@ -332,14 +332,14 @@ int RRT::RTG_RRT::search(Collision::collision *collimap, vector<float> *L_theta,
 
 	int iter = 1;
 	Vehicle::Node rand_node;
-	float lambda = 0.2f;
+	double lambda = 0.2f;
 	int is_extend;
 	int extended_num(0), unextended_num(0); 
 	for (; iter < max_size; iter++)
 	{
-		std::uniform_real_distribution<float> rand = std::uniform_real_distribution<float>(0.f, 1.f);
+		std::uniform_real_distribution<double> rand = std::uniform_real_distribution<double>(0.f, 1.f);
 		std::default_random_engine e(iter*time(0));
-		float rand_lambda = rand(e);
+		double rand_lambda = rand(e);
 		if (rand_lambda < lambda)
 		{
 			vector<Vehicle::Node> *path = new vector<Vehicle::Node>;
@@ -376,15 +376,15 @@ int RRT::RTG_RRT::search(Collision::collision *collimap, vector<float> *L_theta,
 //flag=1:lanechangeleft;flag=2:lanechangeright;flag=3:lanechangeleftc;flag=4:lanechangerightc
 //flag=5:leftturn;flag=6:rightturn;flag=7:leftturnc;flag=8:Uturn
 //2:success 1:partially extension 0:failure
-int RRT::RTG_RRT::force_extend(vector<float> *L_theta, Collision::collision *collimap, float *le)
+int RRT::RTG_RRT::force_extend(vector<double> *L_theta, Collision::collision *collimap, double *le)
 {
 	Index near_node_index;
 	nearest_search(dest->_node(), &near_node_index);
 
 	Vehicle::Node startnode = (*tree)[near_node_index]._node();
 	
-	vector<float> *bound_condition = new vector<float>{ dest->_node()->x - startnode.x, dest->_node()->y - startnode.y, dest->_node()->theta - startnode.theta };
-	vector<float> *control = new vector<float>;
+	vector<double> *bound_condition = new vector<double>{ dest->_node()->x - startnode.x, dest->_node()->y - startnode.y, dest->_node()->theta - startnode.theta };
+	vector<double> *control = new vector<double>;
 	bool is_force_exist;
 	if ((*bound_condition)[2] >= THETA_min_L && (*bound_condition)[2] <= THETA_max_L)
 	{
@@ -418,7 +418,7 @@ int RRT::RTG_RRT::force_extend(vector<float> *L_theta, Collision::collision *col
 	}
 }
 
-int RRT::RTG_RRT::force_extend(const float &l, const float &w, const float &r, vector<float> *L_theta, Collision::collision *collimap, float *le)
+int RRT::RTG_RRT::force_extend(const double &l, const double &w, const double &r, vector<double> *L_theta, Collision::collision *collimap, double *le)
 {
 	Index near_node_index;
 	nearest_search(dest->_node(), &near_node_index);
@@ -426,10 +426,10 @@ int RRT::RTG_RRT::force_extend(const float &l, const float &w, const float &r, v
 	Vehicle::Node startnode = (*tree)[near_node_index]._node();
 	Vehicle::Node endnode = Vehicle::Node(dest->_node()->x - startnode.x, dest->_node()->y - startnode.y, dest->_node()->theta - startnode.theta);
 
-	vector<float> *bound_condition = new vector<float>{ dest->_node()->x - startnode.x, dest->_node()->y - startnode.y, dest->_node()->theta - startnode.theta };
-	vector<float> *control = new vector<float>;
+	vector<double> *bound_condition = new vector<double>{ dest->_node()->x - startnode.x, dest->_node()->y - startnode.y, dest->_node()->theta - startnode.theta };
+	vector<double> *control = new vector<double>;
 	bool is_force_exist;
-	vector<float> *constraints = new vector<float>{ l, w };
+	vector<double> *constraints = new vector<double>{ l, w };
 	if (r != 0)
 	{
 		constraints->emplace_back(r);
@@ -480,10 +480,10 @@ int RRT::RTG_RRT::force_extend(const float &l, const float &w, const float &r, v
 	}
 }
 
-void RRT::RTG_RRT::_lambda_ss(float *lambda, const int &num, const float le)
+void RRT::RTG_RRT::_lambda_ss(double *lambda, const int &num, const double le)
 {
-	static float Le = 0.f;
-	float gama = 0.5f;
+	static double Le = 0.f;
+	double gama = 0.5f;
 	if (le == 0.f)
 		*lambda *= expf(-0.5f / num);
 	else
@@ -495,8 +495,8 @@ void RRT::RTG_RRT::_lambda_ss(float *lambda, const int &num, const float le)
 
 void RRT::RTG_RRT::getpath()
 {
-	float sg = 0.;
-	Vector6f coeff;
+	double sg = 0.;
+	Vector6d coeff;
 	for (auto i = dest->_index(); i != 0;)
 	{		
 		route_tree->push_back(*((*tree)[i]._node()));
