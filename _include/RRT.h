@@ -3,9 +3,14 @@
 
 #include <algorithm>
 #include <ctime>
+#include <fstream>
+#include <iostream>
 #include <list>
 #include <math.h>
+#include <map>
 #include <random>
+#include <set>
+#include <stdio.h>
 #include <vector>
 
 #include <Dense>
@@ -33,18 +38,25 @@ namespace RRT
 	{
 		RRT_Node() = default;
 		RRT_Node(const RRT_Node &n) :
-			node(n.node), predecessor(n.predecessor), successor(n.successor),
-			left(n.left), right(n.right), kd_father(n.kd_father), deep(n.deep), index(n.index) {}
-		RRT_Node(RRT_Node *n) :
-			node(n->node), predecessor(n->predecessor), successor(n->successor),
-			left(n->left), right(n->right), kd_father(n->kd_father), deep(n->deep), index(n->index) {}
-		RRT_Node(const Vehicle::Node &n, const Index &i, const Index &p, const Index &max) :node(n), index(i), predecessor(p)
+			node(n.node), predecessor(n.predecessor),/*  successor(n.successor),edge_coeff(n.edge_coeff),*/
+			left(n.left), right(n.right), kd_father(n.kd_father), deep(n.deep), index(n.index)
 		{
-			left = right = kd_father = max; //max equals to the max_size of tree +1
+			successor = new vector<Index>(*n.successor);
+		}
+		RRT_Node(RRT_Node *n) :
+			node(n->node), predecessor(n->predecessor), /*successor(n->successor), edge_coeff(n.edge_coeff),*/
+			left(n->left), right(n->right), kd_father(n->kd_father), deep(n->deep), index(n->index)
+		{
+			successor = new vector<Index>(*n->successor);
+		}
+		RRT_Node(const Vehicle::Node &n, const Index &i, const Index &p) :node(n), index(i), predecessor(p)
+		{
+			left = right = kd_father = -1; //max equals to the max_size of tree +1
 			deep = 0;
+			//edge_coeff[0] = n.k;
 			successor = new vector<Index>;
 		}
-		RRT_Node(const Vehicle::Node &n) :node(n) 
+		RRT_Node(const Vehicle::Node &n) :node(n)
 		{
 			successor = new vector<Index>;
 		}
@@ -91,24 +103,24 @@ namespace RRT
 
 	struct RTG_RRT
 	{
-		RTG_RRT(const Vehicle::Node &xi, const Vehicle::Node &xg, const int &f) :flag(f), max_size(MAXITER)
+		RTG_RRT(const Vehicle::Node &xi, const Vehicle::Node &xg, const int &f) :flag(f)
 		{
 			if (xg.x - xi.x > RRTSTEP_l || xg.y - xi.y > RRTSTEP_s)
 				step = RRTSTEP_l;
 			else
 				step = RRTSTEP_s;
-			root = new RRT_Node(xi, 0, 0, max_size + 1);
-			dest = new RRT_Node(xg, max_size + 1, max_size + 1, max_size + 1);
+			root = new RRT_Node(xi, 0, 0);
+			dest = new RRT_Node(xg, MAXITER + 1, MAXITER + 1);
 			tree = new vector<RRT_Node>;
 			route_tree = new vector<Vehicle::Node>;
-			tree->reserve(max_size + 1);
+			//tree->reserve(max_size + 1);
 			tree->emplace_back(root);
 		}
 		RTG_RRT() :RTG_RRT(Vehicle::Node(), Vehicle::Node(), 0) {}
 		~RTG_RRT()
 		{
 			delete root, dest;
-			delete tree, route_tree;
+			//delete tree, route_tree;
 		}
 
 		// NN_search
@@ -118,31 +130,36 @@ namespace RRT
 		void nearest_search(const Vehicle::Node &node, Index* near_node);  //virtual
 
 		// random select
-		void rand_select(Vehicle::Node *rand_node, const int &iter); //virtual
-		void _lambda_ss(double *lambda, const int &num, const double le = 0.f); //le=0:unextendable  le!=0:extendable
+		//void rand_select(const int &type, const int &iter, const double &l, Vehicle::Node *rand_node); //virtual
+		void _lambda_ss(double *lambda, const int &num, const double le = 0.); //le=0:unextendable  le!=0:extendable
+		void rand_normal(const int &iter, Vehicle::Node *rand_node);
+		void rand_gaussian(const int &iter, vector<double> *gaus_para, Point2D *refer_point, Vehicle::Node *rand_node);
+		void gaussian_para(const int &type, vector<double> *gaus_para);
+		void gaussian_para_Uturn(const double &l, const int &i, vector<double> *gaus_para, Point2D *refer_point);
 
 		// template path generate
-		int force_extend(vector<double> *L_theta, Collision::collision *collimap, double *le);//2:success 1:partially extension 0:failure
-		int force_extend(const double &l, const double &w, const double &r, vector<double> *L_theta, Collision::collision *collimap, double *le);
+		int force_extend(const int &type, vector<double> *L_theta, Collision::collision *collimap, double *le);//2:success 1:partially extension 0:failure
+		int force_extend(const int &type, const double &l, const double &w, /*const double &r,*/ vector<double> *L_theta, Collision::collision *collimap, double *le);
 		void path2tree(const Index &predecessor, vector<Vehicle::Node> *path);
 
 		// grow of tree
 		int grow(Vehicle::Node *new_node, Collision::collision *collimap); //2:success 1:partially extension 0:failure
-		int search(Collision::collision *collimap, vector<double> *L_theta, const double l = 0, const double w = 0, const double r = 0); //virtual
+		int search(const int &type, vector<double> *L_theta, Collision::collision *collimap, int *count, const double l = 0., const double w = 0., const double r = 0.); //virtual
 
 		// get final path 
 		void getpath();
 
 		vector<RRT_Node>* _tree() { return tree; }
 		vector<Vehicle::Node>* _route_tree() { return route_tree; }
+		RRT_Node* _root() { return root; }
 
 	private:
 		RRT_Node *root, *dest;
 		vector<RRT_Node>* tree;
 		vector<Vehicle::Node>* route_tree;
 		double step;
-		int max_size;
-		int flag; //flag=0:basic RRT; flag=1:TG_RRTG_RRTRT
+		//int max_size;
+		int flag; //flag=0:basic RRT; flag=1:RTG_RRT  真正使用时可省略
 	};
 }
 

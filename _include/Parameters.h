@@ -8,6 +8,9 @@
 #define SAFESTEP 2. //max(L_F_BA, interval of environment)
 #define kNN_NUM 5 //kNN个数
 #define BT_MAX 10 //最大回溯次数
+#define U_TURN_RAND_STEP1 20
+#define U_TURN_RAND_STEP2 120
+#define U_TURN_RAND_STEP3 140
 
 /************************************Vehicle Parameters***********************************/
 #define PI 3.1415926535898
@@ -30,6 +33,7 @@
 #define YMAX 30.
 #define YMIN -22.75
 #define INTERVAL 0.15
+#define LANE_WIDTH 3.5
 
 /********************Pre_traj Parameters getting from Environment Map*******************/
 #define ERROR_1 0.3 //距离约束的距离 需要大于地图间隔

@@ -30,9 +30,10 @@ int main()
 	Trajectory::State XI(xi);
 	Trajectory::State XG(xg);
 
+	int count = 0;
 	auto start = steady_clock::now();
 	RRT::RTG_RRT rrt(*XI._node(), *XG._node(), 1);
-	int result = rrt.search(collimap, L_theta);
+	int result = rrt.search(3, L_theta, collimap, &count);
 	auto end = steady_clock::now();
 
 	if (result)

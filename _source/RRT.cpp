@@ -12,7 +12,7 @@ void RRT::RTG_RRT::kd_insert(RRT_Node *new_node, const Index &insert_index)
 		case 0:
 			if (norm(new_node->_node()->x, XMAX, XMIN) > norm((*tree)[curr]._node()->x, XMAX, XMIN))
 			{
-				if ((*tree)[curr]._right() != max_size + 1)
+				if ((*tree)[curr]._right() != -1)
 					curr = (*tree)[curr]._right();
 				else
 				{
@@ -22,7 +22,7 @@ void RRT::RTG_RRT::kd_insert(RRT_Node *new_node, const Index &insert_index)
 			}
 			else
 			{
-				if ((*tree)[curr]._left() != max_size + 1)
+				if ((*tree)[curr]._left() != -1)
 					curr = (*tree)[curr]._left();
 				else
 				{
@@ -34,7 +34,7 @@ void RRT::RTG_RRT::kd_insert(RRT_Node *new_node, const Index &insert_index)
 		case 1:
 			if (norm(new_node->_node()->y, dest->_node()->y, 0) > norm((*tree)[insert_index]._node()->y, dest->_node()->y, 0))
 			{
-				if ((*tree)[curr]._right() != max_size + 1)
+				if ((*tree)[curr]._right() != -1)
 					curr = (*tree)[curr]._right();
 				else
 				{
@@ -44,7 +44,7 @@ void RRT::RTG_RRT::kd_insert(RRT_Node *new_node, const Index &insert_index)
 			}
 			else
 			{
-				if ((*tree)[curr]._left() != max_size + 1)
+				if ((*tree)[curr]._left() != -1)
 					curr = (*tree)[curr]._left();
 				else
 				{
@@ -92,7 +92,7 @@ void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
 	while (1)
 	{
 		Index old = 0;
-		while (curr != max_size + 1)
+		while (curr != -1)
 		{
 			old = curr;
 			switch ((*tree)[curr]._deep())
@@ -122,7 +122,6 @@ void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
 				}
 				break;
 			}
-
 			if (BPQ_old->find(old) == BPQ_old->end())
 				BPQ->insert({ Trajectory::dist(node, *(*tree)[old]._node()), old });//避免重复插入BPQ
 		}
@@ -162,7 +161,7 @@ void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
 						if (norm(node.x, XMAX, XMIN) < norm((*tree)[curr]._node()->x, XMAX, XMIN))
 						{
 							curr = (*tree)[curr]._right();
-							if (curr == max_size + 1)
+							if (curr == -1)
 							{
 								curr = tmp;
 								kNN_add(node, curr, kNN);
@@ -174,7 +173,7 @@ void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
 						else
 						{
 							curr = (*tree)[curr]._left();
-							if (curr == max_size + 1)
+							if (curr == -1)
 							{
 								curr = tmp;
 								kNN_add(node, curr, kNN);
@@ -188,7 +187,7 @@ void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
 						if (norm(node.y, dest->_node()->y, 0) < norm((*tree)[curr]._node()->y, dest->_node()->y, 0))
 						{
 							curr = (*tree)[curr]._right();
-							if (curr == max_size + 1)
+							if (curr == -1)
 							{
 								curr = tmp;
 								kNN_add(node, curr, kNN);
@@ -200,7 +199,7 @@ void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
 						else
 						{
 							curr = (*tree)[curr]._left();
-							if (curr == max_size + 1)
+							if (curr == -1)
 							{
 								curr = tmp;
 								kNN_add(node, curr, kNN);
@@ -224,6 +223,8 @@ void RRT::RTG_RRT::kNN_search(const Vehicle::Node &node, DIS_TO_NODE *kNN)
 			else
 				break;
 		}
+		else
+			break;
 	}
 	delete BPQ, BPQ_old;
 }
@@ -233,11 +234,16 @@ void RRT::RTG_RRT::nearest_search(const Vehicle::Node &node, Index* near_node)
 	DIS_TO_NODE *kNN = new DIS_TO_NODE;
 	kNN_search(node, kNN);
 
+	double near_theta;
 	Index near_node_tmp;
 	double min_dist = 1000;
+	double delta_theta, dist;
 	for (auto &i : *kNN)
 	{
-		double dist = i.first;
+		near_theta = atan2(node.y - (*tree)[i.second]._node()->y, node.x - (*tree)[i.second]._node()->x);
+		delta_theta = (*tree)[i.second]._node()->theta - near_theta;
+		Trajectory::norm_theta_pi(&delta_theta);
+		dist = i.first + PI - delta_theta;
 		if (dist < min_dist)
 		{
 			min_dist = dist;
@@ -247,14 +253,87 @@ void RRT::RTG_RRT::nearest_search(const Vehicle::Node &node, Index* near_node)
 	*near_node = near_node_tmp;
 }
 
-void RRT::RTG_RRT::rand_select(Vehicle::Node *rand_node, const int &iter)
+void RRT::RTG_RRT::rand_normal(const int &iter, Vehicle::Node *rand_node)
 {
 	std::uniform_real_distribution<double> rand_x, rand_y;
 	rand_x = std::uniform_real_distribution<double>(XMIN, XMAX);
 	rand_y = std::uniform_real_distribution<double>(YMIN, YMAX);
-	std::default_random_engine e(iter*time(0));
+	std::default_random_engine e_x(iter*time(0)), e_y(iter*time(0) * 2);
 
-	*rand_node = Vehicle::Node(rand_x(e), rand_y(e), 0, 0);
+	*rand_node = Vehicle::Node(rand_x(e_x), rand_y(e_y), 0, 0);
+}
+
+void RRT::RTG_RRT::rand_gaussian(const int &iter, vector<double> *gaus_para, Point2D *refer_point, Vehicle::Node *rand_node)
+{
+	std::uniform_real_distribution<double> n;
+	std::default_random_engine r_e(iter*time(0)), theta_e(2 * iter*time(0));
+	double r = n(r_e)*(*gaus_para)[0] + (*gaus_para)[1];
+	double theta = n(theta_e)*(*gaus_para)[2] + (*gaus_para)[3];
+
+	*rand_node = Vehicle::Node(refer_point->x + r*cos(theta), refer_point->y + r*sin(theta), 0);
+}
+
+//gaus_para={sigma_r,r0,sigma_theta,theta0}
+void RRT::RTG_RRT::gaussian_para(const int &type, vector<double> *gaus_para)
+{
+	double sigma_r, sigma_theta, r0(0.5*step), theta0;
+	switch (type)
+	{
+	case 0:
+		sigma_r = Trajectory::dist(root->_node(), dest->_node());
+		r0 = 0.5*step;
+		sigma_theta = 0.35*PI;
+		theta0 = atan2(dest->_node()->y - root->_node()->y, dest->_node()->x - root->_node()->x) - 0.5*sigma_theta;
+		break;
+	case 1:
+		sigma_r = Trajectory::dist(root->_node(), dest->_node());
+		r0 = 0.5*step;
+		theta0 = atan2(dest->_node()->y - 0.5*LANE_WIDTH - root->_node()->y, dest->_node()->x - root->_node()->x);
+		sigma_theta = std::abs(atan2(dest->_node()->y + 0.5*LANE_WIDTH - root->_node()->y, dest->_node()->x - root->_node()->x) - theta0);
+		break;
+	case 2:
+		sigma_r = Trajectory::dist(root->_node(), dest->_node());
+		r0 = 0.3*step;
+		theta0 = atan2(-1.5, dest->_node()->x - root->_node()->x);
+		sigma_theta = std::abs(atan2(dest->_node()->y - root->_node()->y, dest->_node()->x - root->_node()->x) - theta0);
+		break;
+	}
+	*gaus_para = { sigma_r, r0, sigma_theta, theta0 };
+}
+
+void RRT::RTG_RRT::gaussian_para_Uturn(const double &l, const int &i, vector<double> *gaus_para, Point2D *refer_point)
+{
+	double sigma_r, sigma_theta, r0(0), theta0;
+	Index near;
+	switch (i)
+	{
+	case 0:
+		sigma_r = l == 0 ? L_F_BA : l;
+		sigma_theta = PI / 18;
+		theta0 = root->_node()->theta;
+		break;
+	case 1:
+		nearest_search(Vehicle::Node(l == 0 ? L_F_BA : l, 0.5*(root->_node()->y + dest->_node()->y), 0, 0), &near);
+		refer_point->reset((*tree)[near]._node()->x, (*tree)[near]._node()->y);
+		sigma_r = 1 / std::min(KMAX, std::abs(KMIN));
+		theta0 = (*tree)[near]._node()->theta;
+		sigma_theta = std::max(0.5*PI, 0.5*PI - theta0);
+		break;
+	case 2:
+		nearest_search(*dest->_node(), &near);
+		refer_point->reset((*tree)[near]._node()->x, (*tree)[near]._node()->y);
+		sigma_r = Trajectory::dist(refer_point->x, refer_point->y, dest->_node()->x, dest->_node()->y);
+		sigma_theta = PI / 18;
+		theta0 = atan2(dest->_node()->y - refer_point->y, dest->_node()->x - refer_point->x);
+		break;
+	case 3:
+		refer_point->reset(root->_node()->x, root->_node()->y);
+		sigma_r = (l == 0 ? L_F_BA : l) + 1 / std::min(KMAX, std::abs(KMIN));
+		theta0 = root->_node()->theta;
+		sigma_theta = std::max(0.5*PI, 0.5*PI - theta0);
+		break;
+	}
+	*gaus_para = { sigma_r, r0, sigma_theta, theta0 };
 }
 
 int RRT::RTG_RRT::grow(Vehicle::Node *new_node, Collision::collision *collimap)
@@ -286,7 +365,7 @@ int RRT::RTG_RRT::grow(Vehicle::Node *new_node, Collision::collision *collimap)
 		if (!collimap->iscollision((*tree)[near_node_index]._node(), *new_node))
 		{
 			Index new_index = tree->size();
-			tree->emplace_back(*new_node, new_index, near_node_index, max_size + 1);
+			tree->emplace_back(*new_node, new_index, near_node_index);
 			(*tree)[near_node_index]._successor(new_index);
 			kd_insert(&(*tree)[new_index], near_node_index);
 			result = 1;
@@ -300,15 +379,14 @@ void RRT::RTG_RRT::path2tree(const Index &predecessor, vector<Vehicle::Node> *pa
 {
 	int size = tree->size();
 	tree->rbegin()->_successor(size);
-	tree->emplace_back(*path->begin(), size++, predecessor, max_size);
-	
+	tree->emplace_back(*path->begin(), size++, predecessor);
+
 	for (auto n = path->begin() + 1; n != path->end(); n++)
 	{
 		tree->rbegin()->_successor(size);
-		tree->emplace_back(*n, size, size - 1, max_size);		
+		tree->emplace_back(*n, size, size - 1);
 		size++;
 	}
-	
 	if (*(path->rbegin()) == *dest->_node())
 	{
 		dest->_index(size - 1);
@@ -316,34 +394,43 @@ void RRT::RTG_RRT::path2tree(const Index &predecessor, vector<Vehicle::Node> *pa
 	}
 }
 
-int RRT::RTG_RRT::search(Collision::collision *collimap, vector<double> *L_theta, const double l, const double w, const double r)
+int RRT::RTG_RRT::search(const int &type, vector<double> *L_theta, Collision::collision *collimap, int *count, const double l, const double w, const double r)
 {
 	double le = 0;
 	if (l == 0 && w == 0 && r == 0)
 	{
-		if (force_extend(L_theta, collimap, &le) == 2)
+		if (force_extend(type, L_theta, collimap, &le) == 2)
 			return 2;
 	}
 	else
 	{
-		if (force_extend(l, w, r, L_theta, collimap, &le) == 2)
+		if (force_extend(type, l, w, L_theta, collimap, &le) == 2)
 			return 2;
 	}
-
-	int iter = 1;
-	Vehicle::Node rand_node;
-	double lambda = 0.2f;
-	int is_extend;
-	int extended_num(0), unextended_num(0); 
-	for (; iter < max_size; iter++)
+	vector<double> *gaus_para = new vector<double>(4);
+	Point2D *refer_point = new Point2D(root->_node()->x, root->_node()->y);
+	if (flag == 1)
 	{
-		std::uniform_real_distribution<double> rand = std::uniform_real_distribution<double>(0.f, 1.f);
+		if (type == 3)
+			gaussian_para_Uturn(l, 0, gaus_para, refer_point);
+		else
+			gaussian_para(type, gaus_para);
+	}
+
+	int iter = 1, rand_num = 0;
+	Vehicle::Node rand_node;
+	double lambda = 0.2;
+	int is_extend;
+	int extended_num(0), unextended_num(0);
+	for (; iter < MAXITER; iter++)
+	{
+		std::uniform_real_distribution<double> rand;
 		std::default_random_engine e(iter*time(0));
 		double rand_lambda = rand(e);
 		if (rand_lambda < lambda)
 		{
 			vector<Vehicle::Node> *path = new vector<Vehicle::Node>;
-			is_extend = force_extend(L_theta, collimap, &le);
+			is_extend = force_extend(1, L_theta, collimap, &le);
 			switch (is_extend)
 			{
 			case 0:
@@ -357,54 +444,86 @@ int RRT::RTG_RRT::search(Collision::collision *collimap, vector<double> *L_theta
 				_lambda_ss(&lambda, extended_num, le);
 			case 2:
 				break;
-			}				
+			}
 		}
 		else
 		{
-			rand_select(&rand_node, iter);
+			rand_num++;
+
+			if (flag == 0)
+				rand_normal(iter, &rand_node);
+			else
+			{
+				if (type == 3)
+				{
+					switch (rand_num)
+					{
+					case U_TURN_RAND_STEP1:
+						gaussian_para_Uturn(l, 1, gaus_para, refer_point);
+						break;
+					case U_TURN_RAND_STEP2:
+						gaussian_para_Uturn(l, 2, gaus_para, refer_point);
+						break;
+					case U_TURN_RAND_STEP3:
+						gaussian_para_Uturn(l, 3, gaus_para, refer_point);
+						break;
+					default:
+						break;
+					}
+				}
+				rand_gaussian(iter, gaus_para, refer_point, &rand_node);
+			}
+
 			is_extend = grow(&rand_node, collimap);
 		}
+
 		if (is_extend == 2)
 			break;
 	}
+	*count = iter;
+	cout << iter << endl;
 	if (is_extend == 2)
 		return 1;
 	else
 		return 0;
 }
 
-//flag=1:lanechangeleft;flag=2:lanechangeright;flag=3:lanechangeleftc;flag=4:lanechangerightc
-//flag=5:leftturn;flag=6:rightturn;flag=7:leftturnc;flag=8:Uturn
+//flag=1:lanechange;flag=2:turn;flag=3:Uturn flag=4:straight
 //2:success 1:partially extension 0:failure
-int RRT::RTG_RRT::force_extend(vector<double> *L_theta, Collision::collision *collimap, double *le)
+int RRT::RTG_RRT::force_extend(const int &type, vector<double> *L_theta, Collision::collision *collimap, double *le)
 {
 	Index near_node_index;
-	nearest_search(dest->_node(), &near_node_index);
+	nearest_search(*dest->_node(), &near_node_index);
 
 	Vehicle::Node startnode = (*tree)[near_node_index]._node();
 	
 	vector<double> *bound_condition = new vector<double>{ dest->_node()->x - startnode.x, dest->_node()->y - startnode.y, dest->_node()->theta - startnode.theta };
 	vector<double> *control = new vector<double>;
 	bool is_force_exist;
-	if ((*bound_condition)[2] >= THETA_min_L && (*bound_condition)[2] <= THETA_max_L)
+	switch (type)
 	{
+	case 1:
 		if ((*bound_condition)[1] > 0)
-			is_force_exist = Trajectory::lanechange(1, *L_theta, *bound_condition, control);
+			is_force_exist = Trajectory::lanechange(1, *L_theta, startnode, *dest->_node(), control);
 		else
-			is_force_exist = Trajectory::lanechange(-1, *L_theta, *bound_condition, control);
-	}
-	else if ((*bound_condition)[2] >= THETA_min_U && (*bound_condition)[2] <= THETA_max_U)
-	{
-		is_force_exist = Trajectory::U_turn(*L_theta, *bound_condition, control);
-	}
-	else
-	{
+			is_force_exist = Trajectory::lanechange(-1, *L_theta, startnode, *dest->_node(), control);
+		break;
+	case 2:
 		if ((*bound_condition)[1] > 0)
-			is_force_exist = Trajectory::turn(1, *L_theta, *bound_condition, control);
+			is_force_exist = Trajectory::turn(1, *L_theta, startnode, *dest->_node(), control);
 		else
-			is_force_exist = Trajectory::turn(-1, *L_theta, *bound_condition, control);
+			is_force_exist = Trajectory::turn(-1, *L_theta, startnode, *dest->_node(), control);
+		break;
+	case 3:
+		is_force_exist = Trajectory::U_turn(*L_theta, startnode, *dest->_node(), control);
+		break;
+	case 4:
+		is_force_exist = Trajectory::straight(*bound_condition, control);
+		break;
+	case 0:
+		is_force_exist = false;
 	}
-	
+
 	if (is_force_exist == false)
 		return 0;
 	else
@@ -418,10 +537,10 @@ int RRT::RTG_RRT::force_extend(vector<double> *L_theta, Collision::collision *co
 	}
 }
 
-int RRT::RTG_RRT::force_extend(const double &l, const double &w, const double &r, vector<double> *L_theta, Collision::collision *collimap, double *le)
+int RRT::RTG_RRT::force_extend(const int &type, const double &l, const double &w, vector<double> *L_theta, Collision::collision *collimap, double *le)
 {
 	Index near_node_index;
-	nearest_search(dest->_node(), &near_node_index);
+	nearest_search(*dest->_node(), &near_node_index);
 
 	Vehicle::Node startnode = (*tree)[near_node_index]._node();
 	Vehicle::Node endnode = Vehicle::Node(dest->_node()->x - startnode.x, dest->_node()->y - startnode.y, dest->_node()->theta - startnode.theta);
@@ -430,43 +549,45 @@ int RRT::RTG_RRT::force_extend(const double &l, const double &w, const double &r
 	vector<double> *control = new vector<double>;
 	bool is_force_exist;
 	vector<double> *constraints = new vector<double>{ l, w };
-	if (r != 0)
+	switch (type)
 	{
-		constraints->emplace_back(r);
-		is_force_exist = Trajectory::turn_c(*L_theta, *bound_condition, *constraints, control);
-		if (is_force_exist == false)
+	case 1:
+		if ((*bound_condition)[1] > 0)
 		{
-			if ((*bound_condition)[1] > 0)
-				is_force_exist = Trajectory::turn(1, *L_theta, *bound_condition, control);
-			else
-				is_force_exist = Trajectory::turn(-1, *L_theta, *bound_condition, control);
-		}
-	}
-	else
-	{
-		if ((*bound_condition)[2] >= THETA_min_L && (*bound_condition)[2] <= THETA_max_L)
-		{
-			if ((*bound_condition)[1] > 0)
-			{
-				is_force_exist = Trajectory::lanechange_c(1, *L_theta, *bound_condition, *constraints, control);
-				if (is_force_exist == false)
-					is_force_exist = Trajectory::lanechange(1, *L_theta, *bound_condition, control);
-			}
-			else
-			{
-				is_force_exist = Trajectory::lanechange_c(-1, *L_theta, *bound_condition, *constraints, control);
-				if (is_force_exist == false)
-					is_force_exist = Trajectory::lanechange(-1, *L_theta, *bound_condition, control);
-			}
+			is_force_exist = Trajectory::lanechange_c(1, *L_theta, startnode, *dest->_node(), *constraints, control);
+			if (is_force_exist == false)
+				is_force_exist = Trajectory::lanechange(1, *L_theta, startnode, *dest->_node(), control);
 		}
 		else
 		{
-			is_force_exist = Trajectory::U_turn_c(*L_theta, *bound_condition, *constraints, control);
+			is_force_exist = Trajectory::lanechange_c(-1, *L_theta, startnode, *dest->_node(), *constraints, control);
 			if (is_force_exist == false)
-				is_force_exist = Trajectory::U_turn(*L_theta, *bound_condition, control);
+				is_force_exist = Trajectory::lanechange(1, *L_theta, startnode, *dest->_node(), control);
 		}
-	} //在有障碍物计算出现错误时，将障碍物去除然后再计算从而最大限度的获得所需路径
-	
+		break;
+	case 2:
+		if ((*bound_condition)[1] > 0)
+		{
+			is_force_exist = Trajectory::turn_c(1, *L_theta, startnode, *dest->_node(), *constraints, control);
+			if (is_force_exist == false)
+				is_force_exist = Trajectory::lanechange(1, *L_theta, startnode, *dest->_node(), control);
+		}
+		else
+		{
+			is_force_exist = Trajectory::turn_c(-1, *L_theta, startnode, *dest->_node(), *constraints, control);
+			if (is_force_exist == false)
+				is_force_exist = Trajectory::lanechange(1, *L_theta, startnode, *dest->_node(), control);
+		}
+		break;
+	case 3:
+		is_force_exist = Trajectory::U_turn_c(*L_theta, startnode, *dest->_node(), *constraints, control);
+		if (is_force_exist == false)
+			is_force_exist = Trajectory::U_turn(*L_theta, startnode, *dest->_node(), control);
+		break;
+	case 0:
+		break;
+	}//出现错误时，将障碍物去除然后再计算从而最大限度的获得所需路径
+
 	if (is_force_exist == 0)
 		return 0;
 	else
@@ -482,8 +603,8 @@ int RRT::RTG_RRT::force_extend(const double &l, const double &w, const double &r
 
 void RRT::RTG_RRT::_lambda_ss(double *lambda, const int &num, const double le)
 {
-	static double Le = 0.f;
-	double gama = 0.5f;
+	static double Le = 0.;
+	double gama = 0.5;
 	if (le == 0.f)
 		*lambda *= expf(-0.5f / num);
 	else
@@ -498,10 +619,14 @@ void RRT::RTG_RRT::getpath()
 	double sg = 0.;
 	Vector6d coeff;
 	for (auto i = dest->_index(); i != 0;)
-	{		
+	{
 		route_tree->push_back(*((*tree)[i]._node()));
 		i = (*tree)[i]._predecessor();
 	}
 	route_tree->push_back(*(root->_node()));
 	std::reverse(route_tree->begin(), route_tree->end());
+	if (flag == 1)
+		std::cout << "The total numbers of tg_rrt:" << route_tree->size() << std::endl;
+	else
+		std::cout << "The total numbers of this tree:" << route_tree->size() << std::endl;
 }
