@@ -20,7 +20,7 @@ Mat* Collision::maptoMat(Environment::EnvironMap *environmap)
 
 Mat* Collision::collision::_kernel(const double &interval)
 {
-	double radius = sqrt(pow(L, 2) + 9 * pow(W, 2)) / 6;
+	double radius = sqrt(pow(L, 2) + 9 * pow(W, 2)) /6;
 	int row = (int)std::ceil(radius / interval);
 	Mat* kernel = new Mat(2 * row, 2 * row, CV_32F, Scalar(0));
 	double obs = (double)(1 / (4 * pow(row, 2)));
@@ -66,11 +66,18 @@ Mat* Collision::collision::_kernel(const double &interval)
 
 void Collision::collision::_collision_map(Environment::EnvironMap *environmap)
 {
+	interval = environmap->_interval();
+	kernel = _kernel(interval);
+	origin[0] = environmap->_range()->begin()->x;
+	origin[1] = environmap->_range()->begin()->y;
 	Mat* environmat = maptoMat(environmap);
 	if (collision_map != nullptr)
 		delete collision_map;
+
 	collision_map = new Mat(environmat->rows, environmat->cols, CV_32F, Scalar(0));
+
 	filter2D(*environmat, *collision_map, -1, *kernel);
+
 	delete environmat;
 }
 

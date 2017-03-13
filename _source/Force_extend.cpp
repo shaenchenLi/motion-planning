@@ -10,133 +10,149 @@ bool Trajectory::straight(const vector<double> &bound_condition, vector<double> 
 	return true;
 }
 
-bool Trajectory::lanechange(const int &sign, const vector<double> &L_theta, const Vehicle::Node &start_node, const Vehicle::Node &end_node, vector<double> *control)
+bool Trajectory::lanechange(const Vehicle::Node &start_node, const Vehicle::Node &end_node, vector<double> *control)
 {
 	control->clear();
-	
-	double x1_tmp, y1_tmp, x2_tmp, y2_tmp, x1, y1, x2, y2;
-	double alfa, l1, l2, l3, alfa_tmp, beita_tmp, l1_tmp, l2_tmp, l3_tmp, alfa_subopt, l1_subopt, l2_subopt, l3_subopt, x1_subopt, y1_subopt, x2_subopt, y2_subopt;
+
+	int sign_y, sign_x;
+	if ((end_node.x - start_node.x) < 0)
+	{
+		sign_x = -1;
+		if ((end_node.y - start_node.y) > 0)
+			sign_y = -1;
+		else
+			sign_y = 1;
+	}
+	else
+	{
+		sign_x = 1;
+		if ((end_node.y - start_node.y) < 0)
+			sign_y = -1;
+		else
+			sign_y = 1;
+	}
+
+	double alfa_tmp, beita_tmp, l1_tmp, l2_tmp, l3_tmp, x1_tmp, y1_tmp, x2_tmp, y2_tmp;
 	bool result = false;
 	bool suboptimal = false;
+	vector<Vector5d>* subopt = new vector<Vector5d>;
+	vector<Vector5d>* opt = new vector<Vector5d>;
 
 	for (auto a = L_theta.begin(); a != L_theta.end(); a += 2)
 	{
 		// calculate l1
 		alfa_tmp = *a;
-		l1_tmp = Vehicle::_L_min(alfa_tmp, 2*ERROR_2);
+		l1_tmp = Vehicle::_L_min(alfa_tmp, 2 * ERROR_2);
 		x1_tmp = start_node.x + l1_tmp*cos(start_node.theta);
 		y1_tmp = start_node.y + l1_tmp*sin(start_node.theta);
-		if (x1_tmp + L_F_BA*std::abs(cos(start_node.theta)) + 0.5*W*std::abs(sin(start_node.theta)) + *(L_theta.end() - 2) > end_node.x)
+		if (sign_x*(end_node.x - x1_tmp) < L_F_BA*std::abs(cos(start_node.theta)) + 0.5*W*std::abs(sin(start_node.theta)) + *(L_theta.end() - 2))
 			break;
-		if (x1_tmp + L_F_BA*std::abs(cos(alfa_tmp - sign*start_node.theta)) + 0.5*W*std::abs(alfa_tmp - sign*sin(start_node.theta)) + *(L_theta.end() - 2) > end_node.x)
+		if (sign_x*(end_node.x - x1_tmp) < L_F_BA*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + 0.5*W*std::abs(alfa_tmp - sign_y*sin(start_node.theta)) + *(L_theta.end() - 2))
 			break;
 
 		// calculate l2&l3
-		l2_tmp = sign*((start_node.x - end_node.x)*sin(end_node.theta) - (start_node.y - end_node.y)*cos(end_node.theta) + l1_tmp*sin(end_node.theta - start_node.theta)) / sin(alfa_tmp - sign*start_node.theta + end_node.theta);
+		l2_tmp = sign_y*((start_node.x - end_node.x)*sin(end_node.theta) - (start_node.y - end_node.y)*cos(end_node.theta) + l1_tmp*sin(end_node.theta - start_node.theta)) / sin(alfa_tmp - sign_y*start_node.theta + end_node.theta);
 		if (l2_tmp < 0)
 			continue;
-		l3_tmp = (end_node.x - start_node.x - l1_tmp*cos(start_node.theta) + l2_tmp*cos(alfa_tmp - sign*start_node.theta)) / cos(end_node.theta);
+		l3_tmp = (end_node.x - start_node.x - l1_tmp*cos(start_node.theta) + l2_tmp*cos(alfa_tmp - sign_y*start_node.theta)) / cos(end_node.theta);
 		if (l3_tmp < 0)
 			continue;
-		//cout << std::min(l2_tmp, l1_tmp) << " " << (std::min(l2_tmp, l3_tmp)) << endl;
-		//cout << (std::min(l2_tmp, l1_tmp) < *(a + 1)) << endl;
-		//cout << (std::min(l2_tmp, l3_tmp) < _L_min(alfa_tmp + thetag)) << endl;
-		//cout << *(a + 1) << " " << _L_min(alfa_tmp + thetag) << endl;
-
-		beita_tmp = alfa_tmp - sign*(start_node.theta - end_node.theta);
+		
+		beita_tmp = alfa_tmp - sign_y*(start_node.theta - end_node.theta);
 		if (beita_tmp > PI)
 			beita_tmp = 2 * PI - beita_tmp;
 		if (std::min(l2_tmp, l1_tmp) < *(a + 1) || std::min(l2_tmp, l3_tmp) < Vehicle::_L_min(beita_tmp))
 			continue;
 
-		//cout << "l2 meets demand" << endl;
-		//cout << "l3 meets demand" << endl;
-
 		x2_tmp = end_node.x - l3_tmp*cos(end_node.theta);
 		y2_tmp = end_node.y - l3_tmp*sin(end_node.theta);
-		if (x2_tmp + L_F_BA*std::abs(cos(alfa_tmp - sign*start_node.theta)) + 0.5*W*std::abs(alfa_tmp - sign*sin(start_node.theta)) + *(L_theta.end() - 2) > end_node.x)
+		if ((sign_x*(end_node.x - x2_tmp) < (L_F_BA*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + 0.5*W*std::abs(sin(alfa_tmp - sign_y*start_node.theta)) + *(L_theta.end() - 2))) || (sign_x*(end_node.x - x2_tmp) < ((L_F_BA*std::abs(cos(end_node.theta))) + 0.5*W*std::abs(sin(end_node.theta)) + *(L_theta.end() - 2))))
 			continue;
-		if (std::abs(y2_tmp + sign*L_F_BA*std::abs(sin(alfa_tmp - sign*start_node.theta)) + sign*0.5*W*std::abs(cos(alfa_tmp - sign*start_node.theta)) + 0.05) > std::abs(end_node.y + sign*0.5*LANE_WIDTH))
+		if ((std::abs(y2_tmp + sign_y*L_F_BA*std::abs(sin(alfa_tmp - sign_y*start_node.theta)) + sign_y*0.5*W*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + 0.05) > std::abs(end_node.y + sign_y*0.5*LANE_WIDTH)) || (std::abs(y2_tmp + sign_y*L_F_BA*std::abs(sin(end_node.theta)) + sign_y*0.5*W*std::abs(cos(end_node.theta)) + 0.05) > std::abs(end_node.y + sign_y*0.5*LANE_WIDTH)))
 		{
 			suboptimal = true;
-			alfa_subopt = alfa_tmp;
-			l1_subopt = l1_tmp;
-			l2_subopt = l2_tmp;
-			l3_subopt = l3_tmp;
-			x1_subopt = x1_tmp;
-			y1_subopt = y1_tmp;
-			x2_subopt = x2_tmp;
-			y2_subopt = y2_tmp;
+			Vector5d subopt_data;
+			subopt_data << min({ l1_tmp, l2_tmp, l3_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp;
+			subopt->push_back(subopt_data);
 			continue;
 		}
-		if (x2_tmp + L_F_BA*std::abs(cos(end_node.theta)) + 0.5*W*std::abs(sin(end_node.theta)) + *(L_theta.end() - 2) > end_node.x)
-			continue;
-		if (std::abs(y2_tmp + sign*L_F_BA*std::abs(sin(end_node.theta)) + sign*0.5*W*std::abs(cos(end_node.theta)) + 0.05) > std::abs(end_node.y + sign*0.5*LANE_WIDTH))
-		{
-			suboptimal = true;
-			alfa_subopt = alfa_tmp;
-			l1_subopt = l1_tmp;
-			l2_subopt = l2_tmp;
-			l3_subopt = l3_tmp;		
-			x1_subopt = x1_tmp;
-			y1_subopt = y1_tmp;
-			x2_subopt = x2_tmp;
-			y2_subopt = y2_tmp;
-			continue;
-		}
-		//x2_tmp = l1_tmp - l2_tmp*cos(alfa_tmp);
-		//y2_tmp = l2_tmp*sin(alfa_tmp);
-		//if (((y2_tmp + 0.5*W*cos(alfa_tmp)) > yg + W / 2) || (x2_tmp + W / 2 * sin(alfa_tmp) - L_F_BA*cos(alfa_tmp)) > xg)// path can't exceed the allowed lane
-		//	continue;
 
 		result = true;
-		alfa = alfa_tmp;
-		l1 = l1_tmp;
-		l2 = l2_tmp;
-		l3 = l3_tmp;
-		x1 = x1_tmp;
-		y1 = y1_tmp;
-		x2 = x2_tmp;
-		y2 = y2_tmp;
+		Vector5d opt_data;
+		opt_data << min({ l1_tmp, l2_tmp, l3_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp;
+		opt->push_back(opt_data);
 	}
+	auto min_i = opt->begin();
+	double min = 1000;
 	if (result == true)
 	{
-		cout << "l1:" << l1 << " l2:" << l2 << " l3:" << l3 << " alfa:" << alfa << endl;
-		control->push_back(start_node.x); control->push_back(start_node.y);
-		//control->push_back(l1 / 2); control->push_back(0);
-		control->push_back(x1); control->push_back(y1);
-		//control->push_back(0.5*(l1 + x2)); control->push_back(0.5*sign*y2);
-		control->push_back(x2); control->push_back(y2);
-		//control->push_back(0.5*(xg + x2)); control->push_back(0.5*sign*(yg + y2));
-		control->push_back(end_node.x); control->push_back(end_node.y);
+		auto i = opt->begin();
+		for (; i != opt->end(); i++)
+		{
+			if (min > (*i)[0])
+			{
+				min_i = i;
+				min = (*i)[0];
+			}
+		}
 	}
 	else
 	{
 		if (suboptimal == true)
 		{
+			auto i = subopt->begin();
+			for (; i != subopt->end(); i++)
+			{
+				if (min > (*i)[0])
+				{
+					min_i = i;
+					min = (*i)[0];
+				}
+			}
 			result = true;
-			control->push_back(start_node.x); control->push_back(start_node.y);
-			control->push_back(x1_subopt); control->push_back(y1_subopt);
-			control->push_back(x2_subopt); control->push_back(y2_subopt);
-			control->push_back(end_node.x); control->push_back(end_node.y);
 		}
+		else
+			return false;
 	}
+	control->push_back(start_node.x); control->push_back(start_node.y);
+	control->push_back((*min_i)[1]); control->push_back((*min_i)[2]);
+	control->push_back((*min_i)[3]); control->push_back((*min_i)[4]);
+	control->push_back(end_node.x); control->push_back(end_node.y);
+	delete subopt, opt;
 	return result;
 }
 
-bool Trajectory::lanechange_c(const int &sign, const vector<double> &L_theta, const Vehicle::Node &start_node, const Vehicle::Node &end_node, const vector<double> &constraints, vector<double> *control)
+bool Trajectory::lanechange_c(const Vehicle::Node &start_node, const Vehicle::Node &end_node, const vector<double> &constraints, vector<double> *control)
 {
 	control->clear();
 
-	double x1_tmp, y1_tmp, x2_tmp, y2_tmp, x1, y1, x2, y2;
-	double alfa, l1, l2, l3, alfa_tmp, beita_tmp, l1_tmp, l2_tmp, l3_tmp, theta2_tmp, alfa_subopt, l1_subopt, l2_subopt, l3_subopt, x1_subopt, y1_subopt, x2_subopt, y2_subopt;
+	int sign_y;
+	int sign_x;
+	if ((end_node.x - start_node.x) < 0)
+	{
+		sign_x = -1;
+		if ((end_node.y - start_node.y) > 0)
+			sign_y = -1;
+		else
+			sign_y = 1;
+	}
+	else
+	{
+		sign_x = 1;
+		if ((end_node.y - start_node.y) < 0)
+			sign_y = -1;
+		else
+			sign_y = 1;
+	}
+
+	double alfa_tmp, beita_tmp, theta2_tmp, l1_tmp, l2_tmp, l3_tmp, x1_tmp, y1_tmp, x2_tmp, y2_tmp;
 	bool result = false;
 	bool suboptimal = false;
+	vector<Vector5d>* subopt = new vector<Vector5d>;
+	vector<Vector5d>* opt = new vector<Vector5d>;
 
 	double l = constraints[0];
-	double d = constraints[1];//有正负表示方向，和sign一样
-	//cout << bound_condition[0] << " " << bound_condition[1] << " " << bound_condition[2] << endl;
-	//cout << "l:" << l << " w:" << w << endl;
+	double d = constraints[1]*sign_y;//正负表示方向，和sign一样
 
 	for (auto a = L_theta.begin(); a != L_theta.end(); a += 2)
 	{
@@ -146,16 +162,15 @@ bool Trajectory::lanechange_c(const int &sign, const vector<double> &L_theta, co
 
 		x1_tmp = start_node.x + l1_tmp*cos(start_node.theta);
 		y1_tmp = start_node.y + l1_tmp*sin(start_node.theta);
+		
+		l2_tmp = sign_y*((start_node.x - end_node.x)*sin(end_node.theta) - (start_node.y - end_node.y)*cos(end_node.theta) + l1_tmp*sin(end_node.theta - start_node.theta)) / sin(alfa_tmp - sign_y*start_node.theta + end_node.theta);
+		if (l2_tmp < 0)
+			continue;
+		l3_tmp = (end_node.x - start_node.x - l1_tmp*cos(start_node.theta) + l2_tmp*cos(alfa_tmp - sign_y*start_node.theta)) / cos(end_node.theta);
+		if (l3_tmp < 0)
+			continue;
 
-		if (x1_tmp + L_F_BA*std::abs(cos(start_node.theta)) + 0.5*W*std::abs(sin(start_node.theta)) + *(L_theta.end() - 2) > end_node.x)
-			break;
-		if (x1_tmp + L_F_BA*std::abs(cos(alfa_tmp - sign*start_node.theta)) + 0.5*W*std::abs(alfa_tmp - sign*sin(start_node.theta)) + *(L_theta.end() - 2) > end_node.x)
-			break;
-		
-		l2_tmp = ((start_node.x - end_node.x)*sin(end_node.theta) - (start_node.y - end_node.y)*cos(end_node.theta) + l1_tmp*sin(end_node.theta - start_node.theta)) / sin(alfa_tmp - start_node.theta + end_node.theta);
-		l3_tmp = (end_node.x - start_node.x - l1_tmp*cos(start_node.theta) + l2_tmp*cos(alfa_tmp - start_node.theta)) / cos(end_node.theta);
-		
-		beita_tmp = alfa_tmp - sign*(start_node.theta - end_node.theta);
+		beita_tmp = alfa_tmp - sign_y*(start_node.theta - end_node.theta);
 		if (beita_tmp > PI)
 			beita_tmp = 2 * PI - beita_tmp;
 		if (std::min(l2_tmp, l1_tmp) < *(a + 1) || std::min(l2_tmp, l3_tmp) < Vehicle::_L_min(beita_tmp))
@@ -163,181 +178,175 @@ bool Trajectory::lanechange_c(const int &sign, const vector<double> &L_theta, co
 
 		x2_tmp = end_node.x - l3_tmp*cos(end_node.theta);
 		y2_tmp = end_node.y - l3_tmp*sin(end_node.theta);
-		theta2_tmp = alfa_tmp - sign*start_node.theta;
-
-		if (x2_tmp + L_F_BA*std::abs(cos(alfa_tmp - sign*start_node.theta)) + 0.5*W*std::abs(alfa_tmp - sign*sin(start_node.theta)) + *(L_theta.end() - 2) > end_node.x)
-			continue;
-		if (x2_tmp + L_F_BA*std::abs(cos(end_node.theta)) + 0.5*W*std::abs(sin(end_node.theta)) + *(L_theta.end() - 2) > end_node.x)
+		if ((sign_x*(end_node.x - x2_tmp) < (L_F_BA*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + 0.5*W*std::abs(sin(alfa_tmp - sign_y*start_node.theta)) + *(L_theta.end() - 2))) || (sign_x*(end_node.x - x2_tmp) < (L_F_BA*std::abs(cos(end_node.theta)) + 0.5*W*std::abs(sin(end_node.theta)) + *(L_theta.end() - 2))))
 			continue;
 
-		if ((x1_tmp-start_node.x) > l + L_F_BA)
+		theta2_tmp = alfa_tmp - sign_y*start_node.theta;
+
+		if (std::abs(x1_tmp - start_node.x) > l + L_F_BA)
 		{
 			if (start_node.theta == 0.)
 				break;
-			else if (std::abs(d / tan(start_node.theta) + 0.5*W / sin(start_node.theta)) >= l + L_F_BA - ERROR_3)
-				continue;
+			else
+			{
+				if (std::abs(d / tan(start_node.theta) + 0.5*W * sin(start_node.theta)) >= l + L_F_BA - ERROR_3)
+					continue;
+				if (std::abs(d / tan(theta2_tmp) + 0.5*W * sin(theta2_tmp)) >= l + L_F_BA - ERROR_3)
+					continue;
+			}
 		}
 		else
 		{
-			if ((x2_tmp-start_node.x) > l + L_F_BA - ERROR_3)
+			if (std::abs(y1_tmp - start_node.y) < std::abs(d))
+			{
+				if (l1_tmp*cos(start_node.theta) + L_F_BA*std::abs(cos(start_node.theta)) + 0.5*W*std::abs(sin(start_node.theta)) > l + L_F_BA - ERROR_3)
+					break;
+				if (l1_tmp*cos(start_node.theta) + L_F_BA*std::abs(cos(theta2_tmp)) + 0.5*W*std::abs(sin(theta2_tmp)) > l + L_F_BA - ERROR_3)
+					break;
+			}
+			if (std::abs(x2_tmp - start_node.x) > l + L_F_BA)
 			{
 				if (theta2_tmp == 0.)
 				{
-					if (std::abs(d) >= std::abs(y1_tmp - 0.5*W*sign) - ERROR_3)
+					if (std::abs(d) >= std::abs(y1_tmp - 0.5*W*sign_y) - ERROR_3)
 						continue;
 				}
-				else if (x1_tmp - start_node.x + std::abs(0.5*W / sin(theta2_tmp) + (std::abs(d - l1_tmp*sin(start_node.theta))) / tan(theta2_tmp)) >= l + L_F_BA - ERROR_3)
+				else if (std::abs(x1_tmp - start_node.x) + std::abs(0.5*W / sin(theta2_tmp)) + (d - l1_tmp*sin(start_node.theta)) / std::abs(tan(theta2_tmp)) >= l + L_F_BA - ERROR_3)
 					continue;
 			}
 			else
 			{
 				if (end_node.theta == 0.)
 				{
-					if (std::abs(d) >= std::abs(y2_tmp - 0.5*W*sign) - ERROR_3)
+					if (std::abs(d) >= std::abs(y2_tmp - 0.5*W*sign_y) - ERROR_3)
 						continue;
 				}
-				else if (x2_tmp - start_node.x + std::abs((d - y2_tmp + start_node.y + 0.5*W/cos(end_node.theta)) / tan(end_node.theta)) >= l + L_F_BA - ERROR_3)
+				else if (std::abs(x2_tmp - start_node.x) + (d - y2_tmp + start_node.y) / std::abs(tan(end_node.theta)) + std::abs(0.5*W / sin(end_node.theta)) >= l + L_F_BA - ERROR_3)
 					continue;
 			}
 		}
-	
-		//cout << "l1 meets demand" << endl;
-		// calculate l2&l3
-		
-		//cout << std::min(l2_tmp, l1_tmp) << " " << (std::min(l2_tmp, l3_tmp)) << endl;
-		//cout << (std::min(l2_tmp, l1_tmp) < *(a + 1)) << endl;
-		//cout << (std::min(l2_tmp, l3_tmp) < _L_min(alfa_tmp + thetag)) << endl;
-		//cout << *(a + 1) << " " << _L_min(alfa_tmp + thetag) << endl;
-		/*if (l2_tmp <= 0 || l3_tmp <= 0)
-		continue;*/
-		
-		
-		//cout << "l3 meets demand" << endl;
 
-
-		if (std::abs(y2_tmp + sign*L_F_BA*std::abs(sin(alfa_tmp - sign*start_node.theta)) + sign*0.5*W*std::abs(cos(alfa_tmp - sign*start_node.theta)) + 0.05) > std::abs(end_node.y + sign*0.5*LANE_WIDTH))
+		if (((sign_y*(y2_tmp - end_node.y) + L_F_BA*std::abs(sin(alfa_tmp - sign_y*start_node.theta)) + 0.5*W*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + 0.05) > 0.5*LANE_WIDTH) || ((sign_y*(y2_tmp - end_node.y) + L_F_BA*std::abs(sin(end_node.theta)) + 0.5*W*std::abs(cos(end_node.theta)) + 0.05) > 0.5*LANE_WIDTH))
 		{
 			suboptimal = true;
-			alfa_subopt = alfa_tmp;
-			l1_subopt = l1_tmp;
-			l2_subopt = l2_tmp;
-			l3_subopt = l3_tmp;
-			x1_subopt = x1_tmp;
-			y1_subopt = y1_tmp;
-			x2_subopt = x2_tmp;
-			y2_subopt = y2_tmp;
+			Vector5d subopt_data;
+			subopt_data << min({ l1_tmp, l2_tmp, l3_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp;
+			subopt->push_back(subopt_data);
 			continue;
 		}
-		if (std::abs(y2_tmp + sign*L_F_BA*std::abs(sin(end_node.theta)) + sign*0.5*W*std::abs(cos(end_node.theta)) + 0.05) > std::abs(end_node.y + sign*0.5*LANE_WIDTH))
-		{
-			suboptimal = true;
-			alfa_subopt = alfa_tmp;
-			l1_subopt = l1_tmp;
-			l2_subopt = l2_tmp;
-			l3_subopt = l3_tmp;
-			x1_subopt = x1_tmp;
-			y1_subopt = y1_tmp;
-			x2_subopt = x2_tmp;
-			y2_subopt = y2_tmp;
-			continue;
-		}
-		//cout << "l2 meets demand" << endl;
 
 		result = true;
-		alfa = alfa_tmp;
-		l1 = l1_tmp;
-		l2 = l2_tmp;
-		l3 = l3_tmp;
-		x1 = x1_tmp;
-		y1 = y1_tmp;
-		x2 = x2_tmp;
-		y2 = y2_tmp;
+		Vector5d opt_data;
+		opt_data << min({ l1_tmp, l2_tmp, l3_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp;
+		opt->push_back(opt_data);
 	}
+	auto min_i = opt->begin();
+	double min = 1000;
 	if (result == true)
 	{
-		cout << "l1:" << l1 << " l2:" << l2 << " l3:" << l3 << " alfa:" << alfa << endl;
-		control->push_back(start_node.x); control->push_back(start_node.y);
-		//control->push_back(l1 / 2); control->push_back(0);
-		control->push_back(x1); control->push_back(y1);
-		//control->push_back(0.5*(l1 + x2)); control->push_back(0.5*sign*y2);
-		control->push_back(x2); control->push_back(y2);
-		//control->push_back(0.5*(xg + x2)); control->push_back(0.5*sign*(yg + y2));
-		control->push_back(end_node.x); control->push_back(end_node.y);
+		auto i = opt->begin();
+		for (; i != opt->end(); i++)
+		{
+			if (min > (*i)[0])
+			{
+				min_i = i;
+				min = (*i)[0];
+			}
+		}
 	}
 	else
 	{
 		if (suboptimal == true)
 		{
+			auto i = subopt->begin();
+			for (; i != subopt->end(); i++)
+			{
+				if (min > (*i)[0])
+				{
+					min_i = i;
+					min = (*i)[0];
+				}
+			}
 			result = true;
-			control->push_back(start_node.x); control->push_back(start_node.y);
-			control->push_back(x1_subopt); control->push_back(y1_subopt);
-			control->push_back(x2_subopt); control->push_back(y2_subopt);
-			control->push_back(end_node.x); control->push_back(end_node.y);
 		}
+		else
+			return false;
 	}
+	control->push_back(start_node.x); control->push_back(start_node.y);
+	control->push_back((*min_i)[1]); control->push_back((*min_i)[2]);
+	control->push_back((*min_i)[3]); control->push_back((*min_i)[4]);
+	control->push_back(end_node.x); control->push_back(end_node.y);
+	delete subopt, opt;
 	return result;
 }
 
-bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehicle::Node &start_node, const Vehicle::Node &end_node, vector<double> *control)
+bool Trajectory::turn(const Vehicle::Node &start_node, const Vehicle::Node &end_node, vector<double> *control)
 {
 	control->clear();
+
+	int sign_y;
+	int sign_x;
+	if ((end_node.x - start_node.x) < 0)
+	{
+		sign_x = -1;
+		if ((end_node.y - start_node.y) > 0)
+			sign_y = -1;
+		else
+			sign_y = 1;
+	}
+	else
+	{
+		sign_x = 1;
+		if ((end_node.y - start_node.y) < 0)
+			sign_y = -1;
+		else
+			sign_y = 1;
+	}
 	
-	double x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp, x1_subopt, y1_subopt, x2_subopt, y2_subopt, x3_subopt, y3_subopt, x1, y1, x2, y2, x3, y3;
-	double alfa, beita, l1, l2, l3, l4, alfa_tmp, beita_tmp, gama_tmp, l1_tmp, l2_tmp, l3_tmp, l4_tmp, theta2_tmp, alfa_subopt, beita_subopt, l1_subopt, l2_subopt, l3_subopt, l4_subopt;
-	//int *is_tmp_to_list = new int(2);
-	//double x1_subopt_tmp, y1_subopt_tmp, x2_subopt_tmp, y2_subopt_tmp, x3_subopt_tmp, y3_subopt_tmp, alfa_subopt_tmp, beita_subopt_tmp, l1_subopt_tmp, l2_subopt_tmp, l3_subopt_tmp, l4_subopt_tmp;
+	double alfa_tmp, beita_tmp, gama_tmp, l1_tmp, l2_tmp, l3_tmp, l4_tmp, x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
 	double delta_subopt = 1000., delta_tmp;
+	vector<Vector7d> *subopt = new vector<Vector7d>;
+	vector<Vector7d> *opt = new vector<Vector7d>;
 	bool result = false;
 	bool suboptimal = false;
-	//bool is_exceed = false;
 	int flag_1, flag_2; //分别为两种情况的l2和l3的计算，0表示无解，1为有解中有一个分母为0的情况，2为通用情况
-	//cout << bound_condition[0] << " " << bound_condition[1] << " " << bound_condition[2] << endl;
-
-	/*if (thetag == PI / 4)
-		return result;*/
 
 	double step = 0.5;
 	double exceed_allow_x = 0; 
 	double exceed_allow_y = 2; //超出部分到车道中心线的距离
 	for (auto a = L_theta.begin(); a != L_theta.end() - 4; a += 2)
 	{
-		if (result == true/* || is_exceed == true*/)
+		if (result == true)
 			break;
 		// calculate l1
 		alfa_tmp = *a;
 		l1_tmp = *(a + 1) - step;
-		//is_exceed = false;
 
 		while (result == false)
 		{
 			l1_tmp += step;
 
-			//cout << "P1 does not exceed the range" << endl;
 			// calculate l2&l3
 			x1_tmp = start_node.x + l1_tmp*cos(start_node.theta);
 			y1_tmp = start_node.y + l1_tmp*sin(start_node.theta);
-			if (x1_tmp > end_node.x + exceed_allow_x)
-			//{
-				//is_exceed = true;
+			if (sign_x*(x1_tmp - end_node.x) > exceed_allow_x)
 				break;
-			//}
 
 			for (auto b = L_theta.begin(); b != L_theta.end(); b += 2)
 			{
-				if (result == true /*|| is_exceed == true*/)
+				if (result == true)
 					break;
 				beita_tmp = *b;
 				l4_tmp = *(b + 1) - step;
-				//is_exceed = false;
 
-				if ((sin(end_node.theta + sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) == 0.) || (cos(end_node.theta + sign*beita_tmp) == 0.&&cos(alfa_tmp - sign*start_node.theta) == 0.))
+				if ((sin(end_node.theta + sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) == 0.) || (cos(end_node.theta + sign_y*beita_tmp) == 0.&&cos(alfa_tmp - sign_y*start_node.theta) == 0.))
 				{
-					if ((sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) == 0.) || (cos(end_node.theta - sign*beita_tmp) == 0.&&cos(alfa_tmp - sign*start_node.theta) == 0.))
+					if ((sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) == 0.) || (cos(end_node.theta - sign_y*beita_tmp) == 0.&&cos(alfa_tmp - sign_y*start_node.theta) == 0.))
 						continue;
 					else
 					{
 						flag_1 = 0;
-						if (sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) != 0.)
+						if (sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) != 0.)
 							flag_2 = 1;
 						else
 							flag_2 = 2;
@@ -345,14 +354,14 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 				}
 				else
 				{
-					if (sin(end_node.theta + sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) != 0.)
+					if (sin(end_node.theta + sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) != 0.)
 					{
 						flag_1 = 1;
-						if ((sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) == 0.) || (cos(end_node.theta - sign*beita_tmp) == 0.&&cos(alfa_tmp - sign*start_node.theta) == 0.))
+						if ((sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) == 0.) || (cos(end_node.theta - sign_y*beita_tmp) == 0.&&cos(alfa_tmp - sign_y*start_node.theta) == 0.))
 							flag_2 = 0;
 						else
 						{
-							if (sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) != 0.)
+							if (sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) != 0.)
 								flag_2 = 1;
 							else
 								flag_2 = 2;
@@ -361,11 +370,11 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 					else
 					{
 						flag_1 = 2;
-						if ((sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) == 0.) || (cos(end_node.theta - sign*beita_tmp) == 0.&&cos(alfa_tmp - sign*start_node.theta) == 0.))
+						if ((sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) == 0.) || (cos(end_node.theta - sign_y*beita_tmp) == 0.&&cos(alfa_tmp - sign_y*start_node.theta) == 0.))
 							flag_2 = 0;
 						else
 						{
-							if (sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) != 0.)
+							if (sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) != 0.)
 								flag_2 = 1;
 							else
 								flag_2 = 2;
@@ -379,24 +388,21 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 
 					x3_tmp = end_node.x - l4_tmp*cos(end_node.theta);
 					y3_tmp = end_node.y - l4_tmp*sin(end_node.theta);
-					if (sign*y3_tmp < sign*start_node.y - exceed_allow_x)
-					//{
-						//is_exceed = true;
+					if (sign_x*sign_y*y3_tmp < sign_x*sign_y*start_node.y - exceed_allow_x)
 						break;
-					//}
 
 					// 第一种情况：C在D下方
 					if (flag_1 != 0)
 					{
 						if (flag_1 == 1)
 						{
-							l2_tmp = (y3_tmp - y1_tmp) / sin(alfa_tmp - sign*start_node.theta);
-							l3_tmp = (x1_tmp - x3_tmp - l2_tmp*cos(alfa_tmp - sign*start_node.theta)) / cos(end_node.theta + sign*beita_tmp);
+							l2_tmp = (y3_tmp - y1_tmp) / sin(alfa_tmp - sign_y*start_node.theta);
+							l3_tmp = (x1_tmp - x3_tmp - l2_tmp*cos(alfa_tmp - sign_y*start_node.theta)) / cos(end_node.theta + sign_y*beita_tmp);
 						}
 						else
 						{
-							l2_tmp = ((x1_tmp - x3_tmp)*sin(end_node.theta + sign*beita_tmp) + (y3_tmp - y1_tmp)*cos(end_node.theta + sign*beita_tmp)) / sin(alfa_tmp - sign*start_node.theta + end_node.theta + beita_tmp*sign);
-							l3_tmp = (y1_tmp - y3_tmp + l2_tmp*sin(alfa_tmp - sign*start_node.theta)) / sin(end_node.theta + sign*beita_tmp);
+							l2_tmp = ((x1_tmp - x3_tmp)*sin(end_node.theta + sign_y*beita_tmp) + (y3_tmp - y1_tmp)*cos(end_node.theta + sign_y*beita_tmp)) / sin(alfa_tmp - sign_y*start_node.theta + end_node.theta + beita_tmp*sign_y);
+							l3_tmp = (y1_tmp - y3_tmp + l2_tmp*sin(alfa_tmp - sign_y*start_node.theta)) / sin(end_node.theta + sign_y*beita_tmp);
 						}
 
 						if (l2_tmp > 0 && l3_tmp > 0)
@@ -406,23 +412,14 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 								gama_tmp = acos((pow(l2_tmp, 2) + pow(l3_tmp, 2) - pow(dist(x1_tmp, y1_tmp, x3_tmp, y3_tmp), 2)) / (2 * l2_tmp*l3_tmp));
 								if (std::min(l2_tmp, l3_tmp) > Vehicle::_L_min(gama_tmp, 0))
 								{
-									x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - sign*start_node.theta);
-									y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - sign*start_node.theta);
-									if ((y1_tmp - start_node.y) <= -exceed_allow_y*sign && (y2_tmp - start_node.y) <= -exceed_allow_y*sign/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
+									x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - sign_y*start_node.theta);
+									y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - sign_y*start_node.theta);
+									if ((y1_tmp - start_node.y) <= -sign_x*exceed_allow_y*sign_y && (y2_tmp - start_node.y) <= -sign_x*exceed_allow_y*sign_y/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
 									{
 										result = true;
-										alfa = alfa_tmp;
-										beita = beita_tmp;
-										l1 = l1_tmp;
-										l2 = l2_tmp;
-										l3 = l3_tmp;
-										l4 = l4_tmp;
-										x1 = x1_tmp;
-										y1 = y1_tmp;
-										x2 = x2_tmp;
-										y2 = y2_tmp;
-										x3 = x3_tmp;
-										y3 = y3_tmp;
+										Vector7d optdata;
+										optdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+										opt->emplace_back(optdata);
 										break;
 									}
 									else
@@ -431,18 +428,9 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 										delta_tmp = std::abs(y1_tmp - start_node.y) + std::abs(y2_tmp - start_node.y);
 										if (delta_tmp < delta_subopt)
 										{
-											alfa_subopt = alfa_tmp;
-											beita_subopt = beita_tmp;
-											l1_subopt = l1_tmp;
-											l2_subopt = l2_tmp;
-											l3_subopt = l3_tmp;
-											l4_subopt = l4_tmp;
-											x1_subopt = x1_tmp;
-											y1_subopt = y1_tmp;
-											x2_subopt = x2_tmp;
-											y2_subopt = y2_tmp;
-											x3_subopt = x3_tmp;
-											y3_subopt = y3_tmp;
+											Vector7d suboptdata;
+											suboptdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+											subopt->emplace_back(suboptdata);
 										}
 									}
 								}
@@ -455,13 +443,13 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 					{
 						if (flag_2 == 1)
 						{
-							l2_tmp = (y3_tmp - y1_tmp) / sin(alfa_tmp - sign*start_node.theta);
-							l3_tmp = (x1_tmp - x3_tmp - l2_tmp*cos(alfa_tmp - sign*start_node.theta)) / cos(end_node.theta - sign*beita_tmp);
+							l2_tmp = (y3_tmp - y1_tmp) / sin(alfa_tmp - sign_y*start_node.theta);
+							l3_tmp = (x1_tmp - x3_tmp - l2_tmp*cos(alfa_tmp - sign_y*start_node.theta)) / cos(end_node.theta - sign_y*beita_tmp);
 						}
 						else
 						{
-							l2_tmp = ((x1_tmp - x3_tmp)*sin(end_node.theta - sign*beita_tmp) + (y3_tmp - y1_tmp)*cos(end_node.theta - sign*beita_tmp)) / sin(alfa_tmp - sign*start_node.theta + end_node.theta - beita_tmp*sign);
-							l3_tmp = (y1_tmp - y3_tmp + l2_tmp*sin(alfa_tmp - sign*start_node.theta)) / sin(end_node.theta - sign*beita_tmp);
+							l2_tmp = ((x1_tmp - x3_tmp)*sin(end_node.theta - sign_y*beita_tmp) + (y3_tmp - y1_tmp)*cos(end_node.theta - sign_y*beita_tmp)) / sin(alfa_tmp - sign_y*start_node.theta + end_node.theta - beita_tmp*sign_y);
+							l3_tmp = (y1_tmp - y3_tmp + l2_tmp*sin(alfa_tmp - sign_y*start_node.theta)) / sin(end_node.theta - sign_y*beita_tmp);
 						}
 
 						if (l2_tmp <= 0 || l3_tmp <= 0)
@@ -473,23 +461,14 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 						if (std::min(l2_tmp, l3_tmp) < Vehicle::_L_min(gama_tmp, 0))
 							continue;
 
-						x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - sign*start_node.theta);
-						y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - sign*start_node.theta);
-						if ((y1_tmp - start_node.y) <= -exceed_allow_y*sign && (y2_tmp - start_node.y) <= -exceed_allow_y*sign/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
+						x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - sign_y*start_node.theta);
+						y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - sign_y*start_node.theta);
+						if ((y1_tmp - start_node.y) <= -sign_x*exceed_allow_y*sign_y && (y2_tmp - start_node.y) <= -sign_x*exceed_allow_y*sign_y/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
 						{
 							result = true;
-							alfa = alfa_tmp;
-							beita = beita_tmp;
-							l1 = l1_tmp;
-							l2 = l2_tmp;
-							l3 = l3_tmp;
-							l4 = l4_tmp;
-							x1 = x1_tmp;
-							y1 = y1_tmp;
-							x2 = x2_tmp;
-							y2 = y2_tmp;
-							x3 = x3_tmp;
-							y3 = y3_tmp;
+							Vector7d optdata;
+							optdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+							opt->emplace_back(optdata);
 							break;
 						}
 						else
@@ -498,18 +477,9 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 							delta_tmp = std::abs(y1_tmp - start_node.y) + std::abs(y2_tmp - start_node.y);
 							if (delta_tmp < delta_subopt)
 							{
-								alfa_subopt = alfa_tmp;
-								beita_subopt = beita_tmp;
-								l1_subopt = l1_tmp;
-								l2_subopt = l2_tmp;
-								l3_subopt = l3_tmp;
-								l4_subopt = l4_tmp;
-								x1_subopt = x1_tmp;
-								y1_subopt = y1_tmp;
-								x2_subopt = x2_tmp;
-								y2_subopt = y2_tmp;
-								x3_subopt = x3_tmp;
-								y3_subopt = y3_tmp;
+								Vector7d suboptdata;
+								suboptdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+								subopt->emplace_back(suboptdata);
 							}
 						}
 					}
@@ -518,48 +488,80 @@ bool Trajectory::turn(const int &sign, const vector<double> &L_theta, const Vehi
 		}					
 	}
 
+	auto min_i = opt->begin();
+	double min = 1000;
 	if (result == true)
 	{
-		cout << "l1:" << l1 << " l2:" << l2 << " l3:" << l3 << " l4:" << l4 << " alfa:" << alfa << " beita:" << beita << endl;
-		control->push_back(start_node.x); control->push_back(start_node.y);
-		control->push_back(x1); control->push_back(y1);
-		control->push_back(x2); control->push_back(y2);
-		control->push_back(x3); control->push_back(y3);
-		control->push_back(end_node.x); control->push_back(end_node.y);
+		auto i = opt->begin();
+		for (; i != opt->end(); i++)
+		{
+			if (min > (*i)[0])
+			{
+				min_i = i;
+				min = (*i)[0];
+			}
+		}
 	}
 	else
 	{
 		if (suboptimal == true)
 		{
-			cout << "l1:" << l1_subopt << " l2:" << l2_subopt << " l3:" << l3_subopt << " l4:" << l4_subopt<<" alfa:" << alfa_subopt << " beita:" << beita_subopt << endl;
+			auto i = subopt->begin();
+			for (; i != subopt->end(); i++)
+			{
+				if (min > (*i)[0])
+				{
+					min_i = i;
+					min = (*i)[0];
+				}
+			}
 			result = true;
-			control->push_back(start_node.x); control->push_back(start_node.y);
-			control->push_back(x1_subopt); control->push_back(y1_subopt);
-			control->push_back(x2_subopt); control->push_back(y2_subopt);
-			control->push_back(x3_subopt); control->push_back(y3_subopt);
-			control->push_back(end_node.x); control->push_back(end_node.y);
 		}
+		else
+			return false;
 	}
+	control->push_back(start_node.x); control->push_back(start_node.y);
+	control->push_back((*min_i)[1]); control->push_back((*min_i)[2]);
+	control->push_back((*min_i)[3]); control->push_back((*min_i)[4]);
+	control->push_back((*min_i)[5]); control->push_back((*min_i)[6]);
+	control->push_back(end_node.x); control->push_back(end_node.y);
+	delete subopt, opt;
 	return result;
 }
 
-bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Vehicle::Node &start_node, const Vehicle::Node &end_node, const vector<double> &constraints, vector<double> *control)
+bool Trajectory::turn_c(const Vehicle::Node &start_node, const Vehicle::Node &end_node, const vector<double> &constraints, vector<double> *control)
 {
 	control->clear();
 
-	double x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp, x1_subopt, y1_subopt, x2_subopt, y2_subopt, x3_subopt, y3_subopt, x1, y1, x2, y2, x3, y3;
-	double alfa, beita, l1, l2, l3, l4, alfa_tmp, beita_tmp, gama_tmp, l1_tmp, l2_tmp, l3_tmp, l4_tmp, theta2_tmp, alfa_subopt, beita_subopt, l1_subopt, l2_subopt, l3_subopt, l4_subopt;
-	//int *is_tmp_to_list = new int(2);
+	int sign_y;
+	int sign_x;
+	if ((end_node.x - start_node.x) < 0)
+	{
+		sign_x = -1;
+		if ((end_node.y - start_node.y) > 0)
+			sign_y = -1;
+		else
+			sign_y = 1;
+	}
+	else
+	{
+		sign_x = 1;
+		if ((end_node.y - start_node.y) < 0)
+			sign_y = -1;
+		else
+			sign_y = 1;
+	}
+
+	double alfa_tmp, beita_tmp, gama_tmp, l1_tmp, l2_tmp, l3_tmp, l4_tmp, x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
 	double delta_subopt = 1000., delta_tmp;
+	vector<Vector7d> *subopt = new vector<Vector7d>;
+	vector<Vector7d> *opt = new vector<Vector7d>;
 	bool result = false;
 	bool suboptimal = false;
-	//bool is_exceed = false;
 	int flag_1, flag_2; //分别为两种情况的l2和l3的计算，0表示无解，1为有解中有一个分母为0的情况，2为通用情况
 
-	double l = constraints[0];
+	double l = constraints[0]; //从后轴中心算起到约束头
 	double d = constraints[1]; //有正负
-	/*if (thetag == PI / 4)
-	return result;*/
 
 	double step = 0.5;
 	double exceed_allow_x = 0;
@@ -567,43 +569,37 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 
 	for (auto a = L_theta.begin(); a != L_theta.end() - 4; a += 2)
 	{
-		if (result == true/* || is_exceed == true*/)
+		if (result == true)
 			break;
 		// calculate l1
 		alfa_tmp = *a;
 		l1_tmp = *(a + 1) - step;
-		//is_exceed = false;
 
 		while (result == false)
 		{
 			l1_tmp += step;
 
-			//cout << "P1 does not exceed the range" << endl;
 			// calculate l2&l3
 			x1_tmp = start_node.x + l1_tmp*cos(start_node.theta);
 			y1_tmp = start_node.y + l1_tmp*sin(start_node.theta);
-			if (x1_tmp > end_node.x + exceed_allow_x)
-				//{
-				//is_exceed = true;
+			if (sign_x*(x1_tmp - end_node.x) > exceed_allow_x)
 				break;
-			//}
 
 			for (auto b = L_theta.begin(); b != L_theta.end(); b += 2)
 			{
-				if (result == true /*|| is_exceed == true*/)
+				if (result == true)
 					break;
 				beita_tmp = *b;
 				l4_tmp = *(b + 1) - step;
-				//is_exceed = false;
 
-				if ((sin(end_node.theta + sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) == 0.) || (cos(end_node.theta + sign*beita_tmp) == 0.&&cos(alfa_tmp - sign*start_node.theta) == 0.))
+				if ((sin(end_node.theta + sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) == 0.) || (cos(end_node.theta + sign_y*beita_tmp) == 0.&&cos(alfa_tmp - sign_y*start_node.theta) == 0.))
 				{
-					if ((sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) == 0.) || (cos(end_node.theta - sign*beita_tmp) == 0.&&cos(alfa_tmp - sign*start_node.theta) == 0.))
+					if ((sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) == 0.) || (cos(end_node.theta - sign_y*beita_tmp) == 0.&&cos(alfa_tmp - sign_y*start_node.theta) == 0.))
 						continue;
 					else
 					{
 						flag_1 = 0;
-						if (sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) != 0.)
+						if (sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) != 0.)
 							flag_2 = 1;
 						else
 							flag_2 = 2;
@@ -611,14 +607,14 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 				}
 				else
 				{
-					if (sin(end_node.theta + sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) != 0.)
+					if (sin(end_node.theta + sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) != 0.)
 					{
 						flag_1 = 1;
-						if ((sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) == 0.) || (cos(end_node.theta - sign*beita_tmp) == 0.&&cos(alfa_tmp - sign*start_node.theta) == 0.))
+						if ((sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) == 0.) || (cos(end_node.theta - sign_y*beita_tmp) == 0.&&cos(alfa_tmp - sign_y*start_node.theta) == 0.))
 							flag_2 = 0;
 						else
 						{
-							if (sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) != 0.)
+							if (sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) != 0.)
 								flag_2 = 1;
 							else
 								flag_2 = 2;
@@ -627,11 +623,11 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 					else
 					{
 						flag_1 = 2;
-						if ((sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) == 0.) || (cos(end_node.theta - sign*beita_tmp) == 0.&&cos(alfa_tmp - sign*start_node.theta) == 0.))
+						if ((sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) == 0.) || (cos(end_node.theta - sign_y*beita_tmp) == 0.&&cos(alfa_tmp - sign_y*start_node.theta) == 0.))
 							flag_2 = 0;
 						else
 						{
-							if (sin(end_node.theta - sign*beita_tmp) == 0.&&sin(alfa_tmp - sign*start_node.theta) != 0.)
+							if (sin(end_node.theta - sign_y*beita_tmp) == 0.&&sin(alfa_tmp - sign_y*start_node.theta) != 0.)
 								flag_2 = 1;
 							else
 								flag_2 = 2;
@@ -645,24 +641,21 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 
 					x3_tmp = end_node.x - l4_tmp*cos(end_node.theta);
 					y3_tmp = end_node.y - l4_tmp*sin(end_node.theta);
-					if (sign*y3_tmp < sign*start_node.y - exceed_allow_x)
-						//{
-						//is_exceed = true;
+					if (sign_x*sign_y*y3_tmp < sign_x*sign_y*start_node.y - exceed_allow_x)
 						break;
-					//}
 
 					// 第一种情况：C在D下方
 					if (flag_1 != 0)
 					{
 						if (flag_1 == 1)
 						{
-							l2_tmp = (y3_tmp - y1_tmp) / sin(alfa_tmp - sign*start_node.theta);
-							l3_tmp = (x1_tmp - x3_tmp - l2_tmp*cos(alfa_tmp - sign*start_node.theta)) / cos(end_node.theta + sign*beita_tmp);
+							l2_tmp = (y3_tmp - y1_tmp) / sin(alfa_tmp - sign_y*start_node.theta);
+							l3_tmp = (x1_tmp - x3_tmp - l2_tmp*cos(alfa_tmp - sign_y*start_node.theta)) / cos(end_node.theta + sign_y*beita_tmp);
 						}
 						else
 						{
-							l2_tmp = ((x1_tmp - x3_tmp)*sin(end_node.theta + sign*beita_tmp) + (y3_tmp - y1_tmp)*cos(end_node.theta + sign*beita_tmp)) / sin(alfa_tmp - sign*start_node.theta + end_node.theta + beita_tmp*sign);
-							l3_tmp = (y1_tmp - y3_tmp + l2_tmp*sin(alfa_tmp - sign*start_node.theta)) / sin(end_node.theta + sign*beita_tmp);
+							l2_tmp = ((x1_tmp - x3_tmp)*sin(end_node.theta + sign_y*beita_tmp) + (y3_tmp - y1_tmp)*cos(end_node.theta + sign_y*beita_tmp)) / sin(alfa_tmp - sign_y*start_node.theta + end_node.theta + beita_tmp*sign_y);
+							l3_tmp = (y1_tmp - y3_tmp + l2_tmp*sin(alfa_tmp - sign_y*start_node.theta)) / sin(end_node.theta + sign_y*beita_tmp);
 						}
 
 						if (l2_tmp > 0 && l3_tmp > 0)
@@ -672,8 +665,8 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 								gama_tmp = acos((pow(l2_tmp, 2) + pow(l3_tmp, 2) - pow(dist(x1_tmp, y1_tmp, x3_tmp, y3_tmp), 2)) / (2 * l2_tmp*l3_tmp));
 								if (std::min(l2_tmp, l3_tmp) > Vehicle::_L_min(gama_tmp, 0))
 								{
-									x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - sign*start_node.theta);
-									y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - sign*start_node.theta);
+									x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - sign_y*start_node.theta);
+									y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - sign_y*start_node.theta);
 									
 									suboptimal = true;
 									if (sin(start_node.theta) != 0)
@@ -682,56 +675,43 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 											suboptimal = false;
 										else
 										{
-											if (sign*d > sign*(y1_tmp - start_node.y))
+											if (d > sign_x*sign_y*(y1_tmp - start_node.y))
 											{
-												if (sin(alfa_tmp - sign*start_node.theta) != 0)
+												if (((l - std::abs(x1_tmp - start_node.x))* std::abs(sin(alfa_tmp - sign_y*start_node.theta)) + 0.5*W) >= ((d - std::abs(y1_tmp - start_node.y))*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + ERROR_3))
+													suboptimal = false;
+												else
 												{
-													if (((l - std::abs(x1_tmp - start_node.x))* std::abs(sin(alfa_tmp - sign*start_node.theta)) + 0.5*W) >= (((std::abs(d) - std::abs(y1_tmp - start_node.y)))*std::abs(cos(alfa_tmp - sign*start_node.theta)) + ERROR_3))
-														suboptimal = false;
-													else
+													if (d > sign_x*sign_y*(y2_tmp - start_node.y))
 													{
-														if (sign*d > sign*(y2_tmp - start_node.y))
+														if (((l - std::abs(x2_tmp - start_node.x))* std::abs(sin(end_node.theta + sign_y*beita_tmp)) + 0.5*W) >= ((d - std::abs(y2_tmp - start_node.y))*std::abs(cos(end_node.theta + sign_y*beita_tmp)) + ERROR_3))
+															suboptimal = false;
+														else
 														{
-															if (sin(end_node.theta + sign*beita_tmp) != 0)
+															if (d > sign_x*sign_y*(y3_tmp - start_node.y))
 															{
-																if (((l - std::abs(x2_tmp - start_node.x))* std::abs(sin(end_node.theta + sign*beita_tmp)) + 0.5*W) >= (((std::abs(d) - std::abs(y2_tmp - start_node.y)))*std::abs(cos(end_node.theta + sign*beita_tmp)) + ERROR_3))
+																if (((l - std::abs(x3_tmp - start_node.x))* std::abs(sin(end_node.theta)) + 0.5*W) >= ((d - std::abs(y3_tmp - start_node.y))*std::abs(cos(end_node.theta)) + ERROR_3))
 																	suboptimal = false;
-																else
-																{
-																	if (sign*d > sign*(y3_tmp - start_node.y))
-																	{
-																		if (sin(end_node.theta) != 0)
-																		{
-																			if (((l - std::abs(x3_tmp - start_node.x))* std::abs(sin(end_node.theta)) + 0.5*W) >= (((std::abs(d) - std::abs(y3_tmp - start_node.y)))*std::abs(cos(end_node.theta)) + ERROR_3))
-																				suboptimal = false;
-																		}
-																	}
-																}
 															}
 														}
 													}
 												}
+											}
+											else
+											{
+												if ((l* std::abs(sin(start_node.theta)) + 0.5*W) >= (d*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + ERROR_3))
+													suboptimal = false;
 											}
 										}
 									}
 										
 									if (suboptimal == true)
 									{
-										if ((y1_tmp - start_node.y) <= -exceed_allow_y*sign && (y2_tmp - start_node.y) <= -exceed_allow_y*sign/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
+										if ((y1_tmp - start_node.y) <= -sign_x*exceed_allow_y*sign_y && (y2_tmp - start_node.y) <= -sign_x*exceed_allow_y*sign_y/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
 										{
 											result = true;
-											alfa = alfa_tmp;
-											beita = beita_tmp;
-											l1 = l1_tmp;
-											l2 = l2_tmp;
-											l3 = l3_tmp;
-											l4 = l4_tmp;
-											x1 = x1_tmp;
-											y1 = y1_tmp;
-											x2 = x2_tmp;
-											y2 = y2_tmp;
-											x3 = x3_tmp;
-											y3 = y3_tmp;
+											Vector7d optdata;
+											optdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+											opt->emplace_back(optdata);
 											break;
 										}
 										else
@@ -739,18 +719,9 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 											delta_tmp = std::abs(y1_tmp - start_node.y) + std::abs(y2_tmp - start_node.y);
 											if (delta_tmp < delta_subopt)
 											{
-												alfa_subopt = alfa_tmp;
-												beita_subopt = beita_tmp;
-												l1_subopt = l1_tmp;
-												l2_subopt = l2_tmp;
-												l3_subopt = l3_tmp;
-												l4_subopt = l4_tmp;
-												x1_subopt = x1_tmp;
-												y1_subopt = y1_tmp;
-												x2_subopt = x2_tmp;
-												y2_subopt = y2_tmp;
-												x3_subopt = x3_tmp;
-												y3_subopt = y3_tmp;
+												Vector7d suboptdata;
+												suboptdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+												subopt->emplace_back(suboptdata);
 											}
 										}
 									}
@@ -764,13 +735,13 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 					{
 						if (flag_2 == 1)
 						{
-							l2_tmp = (y3_tmp - y1_tmp) / sin(alfa_tmp - sign*start_node.theta);
-							l3_tmp = (x1_tmp - x3_tmp - l2_tmp*cos(alfa_tmp - sign*start_node.theta)) / cos(end_node.theta - sign*beita_tmp);
+							l2_tmp = (y3_tmp - y1_tmp) / sin(alfa_tmp - sign_y*start_node.theta);
+							l3_tmp = (x1_tmp - x3_tmp - l2_tmp*cos(alfa_tmp - sign_y*start_node.theta)) / cos(end_node.theta - sign_y*beita_tmp);
 						}
 						else
 						{
-							l2_tmp = ((x1_tmp - x3_tmp)*sin(end_node.theta - sign*beita_tmp) + (y3_tmp - y1_tmp)*cos(end_node.theta - sign*beita_tmp)) / sin(alfa_tmp - sign*start_node.theta + end_node.theta - beita_tmp*sign);
-							l3_tmp = (y1_tmp - y3_tmp + l2_tmp*sin(alfa_tmp - sign*start_node.theta)) / sin(end_node.theta - sign*beita_tmp);
+							l2_tmp = ((x1_tmp - x3_tmp)*sin(end_node.theta - sign_y*beita_tmp) + (y3_tmp - y1_tmp)*cos(end_node.theta - sign_y*beita_tmp)) / sin(alfa_tmp - sign_y*start_node.theta + end_node.theta - beita_tmp*sign_y);
+							l3_tmp = (y1_tmp - y3_tmp + l2_tmp*sin(alfa_tmp - sign_y*start_node.theta)) / sin(end_node.theta - sign_y*beita_tmp);
 						}
 
 						if (l2_tmp <= 0 || l3_tmp <= 0)
@@ -782,8 +753,8 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 						if (std::min(l2_tmp, l3_tmp) < Vehicle::_L_min(gama_tmp, 0))
 							continue;
 
-						x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - sign*start_node.theta);
-						y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - sign*start_node.theta);
+						x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - sign_y*start_node.theta);
+						y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - sign_y*start_node.theta);
 
 						if (sin(start_node.theta) != 0)
 						{
@@ -791,54 +762,41 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 								continue;
 							else
 							{
-								if (sign*d > sign*(y1_tmp - start_node.y))
+								if (d > sign_x*sign_y*(y1_tmp - start_node.y))
 								{
-									if (sin(alfa_tmp - sign*start_node.theta) != 0)
+									if (((l - std::abs(x1_tmp - start_node.x))* std::abs(sin(alfa_tmp - sign_y*start_node.theta)) + 0.5*W) >= (((d - std::abs(y1_tmp - start_node.y)))*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + ERROR_3))
+										continue;
+									else
 									{
-										if (((l - std::abs(x1_tmp - start_node.x))* std::abs(sin(alfa_tmp - sign*start_node.theta)) + 0.5*W) >= (((std::abs(d) - std::abs(y1_tmp - start_node.y)))*std::abs(cos(alfa_tmp - sign*start_node.theta)) + ERROR_3))
-											continue;
-										else
+										if (d > sign_x*sign_y*(y2_tmp - start_node.y))
 										{
-											if (sign*d > sign*(y2_tmp - start_node.y))
+											if (((l - std::abs(x2_tmp - start_node.x))* std::abs(sin(end_node.theta + sign_y*beita_tmp)) + 0.5*W) >= (((d - std::abs(y2_tmp - start_node.y)))*std::abs(cos(end_node.theta + sign_y*beita_tmp)) + ERROR_3))
+												continue;
+											else
 											{
-												if (sin(end_node.theta + sign*beita_tmp) != 0)
+												if (d > sign_x*sign_y*(y3_tmp - start_node.y))
 												{
-													if (((l - std::abs(x2_tmp - start_node.x))* std::abs(sin(end_node.theta + sign*beita_tmp)) + 0.5*W) >= (((std::abs(d) - std::abs(y2_tmp - start_node.y)))*std::abs(cos(end_node.theta + sign*beita_tmp)) + ERROR_3))
+													if (((l - std::abs(x3_tmp - start_node.x))* std::abs(sin(end_node.theta)) + 0.5*W) >= (((d - std::abs(y3_tmp - start_node.y)))*std::abs(cos(end_node.theta)) + ERROR_3))
 														continue;
-													else
-													{
-														if (sign*d >sign*(y3_tmp - start_node.y))
-														{
-															if (sin(end_node.theta) != 0)
-															{
-																if (((l - std::abs(x3_tmp - start_node.x))* std::abs(sin(end_node.theta)) + 0.5*W) >= (((std::abs(d) - std::abs(y3_tmp - start_node.y)))*std::abs(cos(end_node.theta)) + ERROR_3))
-																	continue;
-															}
-														}
-													}
 												}
 											}
 										}
 									}
 								}
+								else
+								{
+									if ((l* std::abs(sin(start_node.theta)) + 0.5*W) >= (d*std::abs(cos(alfa_tmp - sign_y*start_node.theta)) + ERROR_3))
+										suboptimal = false;
+								}
 							}
 						}
 
-						if ((y1_tmp - start_node.y) <= -exceed_allow_y*sign && (y2_tmp - start_node.y) <= -exceed_allow_y*sign/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
+						if ((y1_tmp - start_node.y) <= -sign_x*exceed_allow_y*sign_y && (y2_tmp - start_node.y) <= -sign_x*exceed_allow_y*sign_y/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
 						{
 							result = true;
-							alfa = alfa_tmp;
-							beita = beita_tmp;
-							l1 = l1_tmp;
-							l2 = l2_tmp;
-							l3 = l3_tmp;
-							l4 = l4_tmp;
-							x1 = x1_tmp;
-							y1 = y1_tmp;
-							x2 = x2_tmp;
-							y2 = y2_tmp;
-							x3 = x3_tmp;
-							y3 = y3_tmp;
+							Vector7d optdata;
+							optdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+							opt->emplace_back(optdata);
 							break;
 						}
 						else
@@ -847,18 +805,9 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 							delta_tmp = std::abs(y1_tmp - start_node.y) + std::abs(y2_tmp - start_node.y);
 							if (delta_tmp < delta_subopt)
 							{
-								alfa_subopt = alfa_tmp;
-								beita_subopt = beita_tmp;
-								l1_subopt = l1_tmp;
-								l2_subopt = l2_tmp;
-								l3_subopt = l3_tmp;
-								l4_subopt = l4_tmp;
-								x1_subopt = x1_tmp;
-								y1_subopt = y1_tmp;
-								x2_subopt = x2_tmp;
-								y2_subopt = y2_tmp;
-								x3_subopt = x3_tmp;
-								y3_subopt = y3_tmp;
+								Vector7d suboptdata;
+								suboptdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+								subopt->emplace_back(suboptdata);
 							}
 						}
 					}
@@ -867,65 +816,84 @@ bool Trajectory::turn_c(const int &sign, const vector<double> &L_theta, const Ve
 		}
 	}
 
+	auto min_i = opt->begin();
+	double min = 1000;
 	if (result == true)
 	{
-		cout << "l1:" << l1_tmp << " l2:" << l2_tmp << " l3:" << l3_tmp << " l4:" << l4_tmp << " alfa:" << alfa_tmp << " beita:" << beita_tmp << endl;
-		control->push_back(start_node.x); control->push_back(start_node.y);
-		control->push_back(x1); control->push_back(y1);
-		control->push_back(x2); control->push_back(y2);
-		control->push_back(x3); control->push_back(y3);
-		control->push_back(end_node.x); control->push_back(end_node.y);
+		auto i = opt->begin();
+		for (; i != opt->end(); i++)
+		{
+			if (min > (*i)[0])
+			{
+				min_i = i;
+				min = (*i)[0];
+			}
+		}
 	}
 	else
 	{
 		if (suboptimal == true)
 		{
-			cout << "l1:" << l1_subopt << " l2:" << l2_subopt << " l3:" << l3_subopt << " l4:" << l4_subopt << " alfa:" << alfa_subopt << " beita:" << beita_subopt << endl;
+			auto i = subopt->begin();
+			for (; i != subopt->end(); i++)
+			{
+				if (min > (*i)[0])
+				{
+					min_i = i;
+					min = (*i)[0];
+				}
+			}
 			result = true;
-			control->push_back(start_node.x); control->push_back(start_node.y);
-			control->push_back(x1_subopt); control->push_back(y1_subopt);
-			control->push_back(x2_subopt); control->push_back(y2_subopt);
-			control->push_back(x3_subopt); control->push_back(y3_subopt);
-			control->push_back(end_node.x); control->push_back(end_node.y);
 		}
+		else
+			return false;
 	}
+	control->push_back(start_node.x); control->push_back(start_node.y);
+	control->push_back((*min_i)[1]); control->push_back((*min_i)[2]);
+	control->push_back((*min_i)[3]); control->push_back((*min_i)[4]);
+	control->push_back((*min_i)[5]); control->push_back((*min_i)[6]);
+	control->push_back(end_node.x); control->push_back(end_node.y);
+	delete subopt, opt;
 	return result;
 }
 
-bool Trajectory::U_turn(const vector<double> &L_theta, const Vehicle::Node &start_node, const Vehicle::Node &end_node, vector<double> *control)
+bool Trajectory::U_turn(const Vehicle::Node &start_node, const Vehicle::Node &end_node, vector<double> *control)
 {
 	control->clear();
 
-	double x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp, x1_subopt, y1_subopt, x2_subopt, y2_subopt, x3_subopt, y3_subopt, x1, y1, x2, y2, x3, y3;
-	double alfa, beita, l1, l2, l3, l4, alfa_tmp, beita_tmp, gama_tmp, l1_tmp, l2_tmp, l3_tmp, l4_tmp, theta2_tmp, alfa_subopt, beita_subopt, l1_subopt, l2_subopt, l3_subopt, l4_subopt;
+	int sign_x;
+	if ((end_node.x - start_node.x) < 0)
+		sign_x = -1;
+	else
+		sign_x = 1;
+
+	double alfa_tmp, beita_tmp, gama_tmp, l1_tmp, l2_tmp, l3_tmp, l4_tmp, x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
 	bool result = false;
 	bool suboptimal = false;
-	//cout << bound_condition[0] << " " << bound_condition[1] << " " << bound_condition[2] << endl;
-
-	/*if (thetag == PI / 4)
-	return result;*/
+	vector<Vector7d>* subopt = new vector<Vector7d>;
+	vector<Vector7d>* opt = new vector<Vector7d>;
 
 	double step = 0.2;
 	double exceed_allow_x = 10.;
 	double exceed_allow_y = 2; //超出部分到车道中心线的距离
 	for (auto a = L_theta.begin(); a != L_theta.end() - 4; a += 2)
 	{
-		if (result == true/* || is_exceed == true*/)
+		if (result == true)
 			break;
 		// calculate l1
 		alfa_tmp = *a;
 		l1_tmp = *(a + 1) - step;
-		//is_exceed = false;
 
 		while (result == false)
 		{
 			l1_tmp += step;
 
-			//cout << "P1 does not exceed the range" << endl;
 			// calculate l2&l3
 			x1_tmp = start_node.x + l1_tmp*cos(start_node.theta);
 			y1_tmp = start_node.y + l1_tmp*sin(start_node.theta);
-			if (x1_tmp > end_node.x + exceed_allow_x)
+			if (sign_x*(x1_tmp - end_node.x) > exceed_allow_x)
+				break;
+			if (y1_tmp<YMIN || y1_tmp>YMAX)
 				break;
 
 			for (auto b = L_theta.begin(); b != L_theta.end(); b += 2)
@@ -944,7 +912,7 @@ bool Trajectory::U_turn(const vector<double> &L_theta, const Vehicle::Node &star
 
 					x3_tmp = end_node.x - l4_tmp*cos(end_node.theta);
 					y3_tmp = end_node.y - l4_tmp*sin(end_node.theta);
-					if (y3_tmp < start_node.y - exceed_allow_x || x3_tmp > end_node.x + exceed_allow_x)
+					if (sign_x*y3_tmp < sign_x*start_node.y - exceed_allow_x || sign_x*(x3_tmp - end_node.x) > exceed_allow_x)
 						break;
 
 					if (sin(end_node.theta + beita_tmp) == 0 && sin(alfa_tmp - start_node.theta) != 0)
@@ -970,109 +938,110 @@ bool Trajectory::U_turn(const vector<double> &L_theta, const Vehicle::Node &star
 					x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - start_node.theta);
 					y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - start_node.theta);
 
-					if (x2_tmp > end_node.x + exceed_allow_x)
+					if (sign_x*(x2_tmp - end_node.x) > exceed_allow_x)
 						continue;
 
-					if ((y1_tmp - start_node.y) <= -exceed_allow_y && (y2_tmp - start_node.y) <= -exceed_allow_y/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
+					if ((y1_tmp - start_node.y) <= -sign_x*exceed_allow_y && (y2_tmp - start_node.y) <= -sign_x*exceed_allow_y /*&& (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
 					{
 						result = true;
-						alfa = alfa_tmp;
-						beita = beita_tmp;
-						l1 = l1_tmp;
-						l2 = l2_tmp;
-						l3 = l3_tmp;
-						l4 = l4_tmp;
-						x1 = x1_tmp;
-						y1 = y1_tmp;
-						x2 = x2_tmp;
-						y2 = y2_tmp;
-						x3 = x3_tmp;
-						y3 = y3_tmp;
+						Vector7d optdata;
+						optdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+						opt->emplace_back(optdata);
 						break;
 					}
 					else
 					{
 						suboptimal = true;
-						alfa_subopt = alfa_tmp;
-						beita_subopt = beita_tmp;
-						l1_subopt = l1_tmp;
-						l2_subopt = l2_tmp;
-						l3_subopt = l3_tmp;
-						l4_subopt = l4_tmp;
-						x1_subopt = x1_tmp;
-						y1_subopt = y1_tmp;
-						x2_subopt = x2_tmp;
-						y2_subopt = y2_tmp;
-						x3_subopt = x3_tmp;
-						y3_subopt = y3_tmp;
+						Vector7d suboptdata;
+						suboptdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+						subopt->emplace_back(suboptdata);
 					}
 				}
 			}
 		}
 	}
 
+	auto min_i = opt->begin();
+	double min = 1000;
 	if (result == true)
 	{
-		cout << "l1:" << l1 << " l2:" << l2 << " l3:" << l3 << " l4:" << l4 << " alfa:" << alfa << " beita:" << beita << endl;
-		control->push_back(start_node.x); control->push_back(start_node.y);
-		control->push_back(x1); control->push_back(y1);
-		control->push_back(x2); control->push_back(y2);
-		control->push_back(x3); control->push_back(y3);
-		control->push_back(end_node.x); control->push_back(end_node.y);
+		auto i = opt->begin();
+		for (; i != opt->end(); i++)
+		{
+			if (min > (*i)[0])
+			{
+				min_i = i;
+				min = (*i)[0];
+			}
+		}
 	}
 	else
 	{
 		if (suboptimal == true)
 		{
-			cout << "l1:" << l1_subopt << " l2:" << l2_subopt << " l3:" << l3_subopt << " l4:" << l4_subopt << " alfa:" << alfa_subopt << " beita:" << beita_subopt << endl;
+			auto i = subopt->begin();
+			for (; i != subopt->end(); i++)
+			{
+				if (min > (*i)[0])
+				{
+					min_i = i;
+					min = (*i)[0];
+				}
+			}
 			result = true;
-			control->push_back(start_node.x); control->push_back(start_node.y);
-			control->push_back(x1_subopt); control->push_back(y1_subopt);
-			control->push_back(x2_subopt); control->push_back(y2_subopt);
-			control->push_back(x3_subopt); control->push_back(y3_subopt);
-			control->push_back(end_node.x); control->push_back(end_node.y);
 		}
+		else
+			return false;
 	}
+	control->push_back(start_node.x); control->push_back(start_node.y);
+	control->push_back((*min_i)[1]); control->push_back((*min_i)[2]);
+	control->push_back((*min_i)[3]); control->push_back((*min_i)[4]);
+	control->push_back((*min_i)[5]); control->push_back((*min_i)[6]);
+	control->push_back(end_node.x); control->push_back(end_node.y);
+	delete subopt, opt;
 	return result;
 }
 
-bool Trajectory::U_turn_c(const vector<double> &L_theta, const Vehicle::Node &start_node, const Vehicle::Node &end_node, const vector<double> &constraints, vector<double> *control)
+bool Trajectory::U_turn_c(const Vehicle::Node &start_node, const Vehicle::Node &end_node, const vector<double> &constraints, vector<double> *control)
 {
 	control->clear();
 
-	double x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp, x1_subopt, y1_subopt, x2_subopt, y2_subopt, x3_subopt, y3_subopt, x1, y1, x2, y2, x3, y3;
-	double alfa, beita, l1, l2, l3, l4, alfa_tmp, beita_tmp, gama_tmp, l1_tmp, l2_tmp, l3_tmp, l4_tmp, theta2_tmp, alfa_subopt, beita_subopt, l1_subopt, l2_subopt, l3_subopt, l4_subopt;
+	int sign_x;
+	if ((end_node.x - start_node.x) < 0)
+		sign_x = -1;
+	else
+		sign_x = 1;
+
+	double alfa_tmp, beita_tmp, gama_tmp, l1_tmp, l2_tmp, l3_tmp, l4_tmp, x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
 	bool result = false;
 	bool suboptimal = false;
-	//cout << bound_condition[0] << " " << bound_condition[1] << " " << bound_condition[2] << endl;
+	vector<Vector7d>* subopt = new vector<Vector7d>;
+	vector<Vector7d>* opt = new vector<Vector7d>;
 
 	double l = constraints[0];
 	double d = constraints[1];
-
-	/*if (thetag == PI / 4)
-	return result;*/
 
 	double step = 0.2;
 	double exceed_allow_x = 10.;
 	double exceed_allow_y = 2; //超出部分到车道中心线的距离
 	for (auto a = L_theta.begin(); a != L_theta.end() - 4; a += 2)
 	{
-		if (result == true/* || is_exceed == true*/)
+		if (result == true)
 			break;
 		// calculate l1
 		alfa_tmp = *a;
 		l1_tmp = *(a + 1) - step;
-		//is_exceed = false;
 
 		while (result == false)
 		{
 			l1_tmp += step;
 
-			//cout << "P1 does not exceed the range" << endl;
 			// calculate l2&l3
 			x1_tmp = start_node.x + l1_tmp*cos(start_node.theta);
 			y1_tmp = start_node.y + l1_tmp*sin(start_node.theta);
-			if (x1_tmp > end_node.x + exceed_allow_x)
+			if (sign_x*(x1_tmp - end_node.x) > exceed_allow_x)
+				break;
+			if (y1_tmp<YMIN || y1_tmp>YMAX)
 				break;
 
 			for (auto b = L_theta.begin(); b != L_theta.end(); b += 2)
@@ -1091,7 +1060,7 @@ bool Trajectory::U_turn_c(const vector<double> &L_theta, const Vehicle::Node &st
 
 					x3_tmp = end_node.x - l4_tmp*cos(end_node.theta);
 					y3_tmp = end_node.y - l4_tmp*sin(end_node.theta);
-					if (y3_tmp < start_node.y - exceed_allow_x || x3_tmp > end_node.x + exceed_allow_x)
+					if (sign_x*y3_tmp < sign_x*start_node.y - exceed_allow_x || sign_x*(x3_tmp - end_node.x) > exceed_allow_x)
 						break;
 
 					if (sin(end_node.theta + beita_tmp) == 0 && sin(alfa_tmp - start_node.theta) != 0)
@@ -1117,7 +1086,7 @@ bool Trajectory::U_turn_c(const vector<double> &L_theta, const Vehicle::Node &st
 					x2_tmp = x1_tmp - l2_tmp*cos(alfa_tmp - start_node.theta);
 					y2_tmp = y1_tmp + l2_tmp*sin(alfa_tmp - start_node.theta);
 
-					if (x2_tmp > end_node.x + exceed_allow_x)
+					if (sign_x*x2_tmp > sign_x*end_node.x + exceed_allow_x)
 						continue;
 
 					if (sin(start_node.theta) != 0)
@@ -1126,27 +1095,27 @@ bool Trajectory::U_turn_c(const vector<double> &L_theta, const Vehicle::Node &st
 							continue;
 						else
 						{
-							if (d > (y1_tmp - start_node.y))
+							if (d > sign_x*(y1_tmp - start_node.y))
 							{
 								if (sin(alfa_tmp - start_node.theta) != 0)
 								{
-									if (((l - std::abs(x1_tmp - start_node.x))* std::abs(sin(alfa_tmp - start_node.theta)) + 0.5*W) >= (((std::abs(d) - std::abs(y1_tmp - start_node.y)))*std::abs(cos(alfa_tmp - start_node.theta)) + ERROR_3))
+									if (((l - std::abs(x1_tmp - start_node.x))* std::abs(sin(alfa_tmp - start_node.theta)) + 0.5*W) >= (((d - std::abs(y1_tmp - start_node.y)))*std::abs(cos(alfa_tmp - start_node.theta)) + ERROR_3))
 										continue;
 									else
 									{
-										if (d > (y2_tmp - start_node.y))
+										if (d > sign_x*(y2_tmp - start_node.y))
 										{
 											if (sin(end_node.theta + beita_tmp) != 0)
 											{
-												if (((l - std::abs(x2_tmp - start_node.x))* std::abs(sin(end_node.theta + beita_tmp)) + 0.5*W) >= (((std::abs(d) - std::abs(y2_tmp - start_node.y)))*std::abs(cos(end_node.theta + beita_tmp)) + ERROR_3))
+												if (((l - std::abs(x2_tmp - start_node.x))* std::abs(sin(end_node.theta + beita_tmp)) + 0.5*W) >= (((d - std::abs(y2_tmp - start_node.y)))*std::abs(cos(end_node.theta + beita_tmp)) + ERROR_3))
 													continue;
 												else
 												{
-													if (d > (y3_tmp - start_node.y))
+													if (d > sign_x*(y3_tmp - start_node.y))
 													{
 														if (sin(end_node.theta) != 0)
 														{
-															if (((l - std::abs(x3_tmp - start_node.x))* std::abs(sin(end_node.theta)) + 0.5*W) >= (((std::abs(d) - std::abs(y3_tmp - start_node.y)))*std::abs(cos(end_node.theta)) + ERROR_3))
+															if (((l - std::abs(x3_tmp - start_node.x))* std::abs(sin(end_node.theta)) + 0.5*W) >= (((d - std::abs(y3_tmp - start_node.y)))*std::abs(cos(end_node.theta)) + ERROR_3))
 																continue;
 														}
 													}
@@ -1159,70 +1128,66 @@ bool Trajectory::U_turn_c(const vector<double> &L_theta, const Vehicle::Node &st
 						}
 					}
 
-					if ((y1_tmp - start_node.y) <= -exceed_allow_y && (y2_tmp - start_node.y) <= -exceed_allow_y/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
+					if ((y1_tmp - start_node.y) <= -sign_x*exceed_allow_y && (y2_tmp - start_node.y) <= -sign_x*exceed_allow_y/* && (y3_tmp - start_node.y) <= -exceed_allow_y*sign && (std::max(x3_tmp, x2_tmp) - end_node.x) <= exceed_allow_y*/)
 					{
 						result = true;
-						alfa = alfa_tmp;
-						beita = beita_tmp;
-						l1 = l1_tmp;
-						l2 = l2_tmp;
-						l3 = l3_tmp;
-						l4 = l4_tmp;
-						x1 = x1_tmp;
-						y1 = y1_tmp;
-						x2 = x2_tmp;
-						y2 = y2_tmp;
-						x3 = x3_tmp;
-						y3 = y3_tmp;
+						Vector7d suboptdata;
+						suboptdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+						subopt->emplace_back(suboptdata);
 						break;
 					}
 					else
 					{
 						suboptimal = true;
-						alfa_subopt = alfa_tmp;
-						beita_subopt = beita_tmp;
-						l1_subopt = l1_tmp;
-						l2_subopt = l2_tmp;
-						l3_subopt = l3_tmp;
-						l4_subopt = l4_tmp;
-						x1_subopt = x1_tmp;
-						y1_subopt = y1_tmp;
-						x2_subopt = x2_tmp;
-						y2_subopt = y2_tmp;
-						x3_subopt = x3_tmp;
-						y3_subopt = y3_tmp;
+						Vector7d suboptdata;
+						suboptdata << min({ l1_tmp, l2_tmp, l3_tmp, l4_tmp }), x1_tmp, y1_tmp, x2_tmp, y2_tmp, x3_tmp, y3_tmp;
+						subopt->emplace_back(suboptdata);
 					}
 				}
 			}
 		}
 	}
 
+	auto min_i = opt->begin();
+	double min = 1000;
 	if (result == true)
 	{
-		cout << "l1:" << l1 << " l2:" << l2 << " l3:" << l3 << " l4:" << l4 << " alfa:" << alfa << " beita:" << beita << endl;
-		control->push_back(start_node.x); control->push_back(start_node.y);
-		control->push_back(x1); control->push_back(y1);
-		control->push_back(x2); control->push_back(y2);
-		control->push_back(x3); control->push_back(y3);
-		control->push_back(end_node.x); control->push_back(end_node.y);
+		auto i = opt->begin();
+		for (; i != opt->end(); i++)
+		{
+			if (min > (*i)[0])
+			{
+				min_i = i;
+				min = (*i)[0];
+			}
+		}
 	}
 	else
 	{
 		if (suboptimal == true)
 		{
-			cout << "l1:" << l1_subopt << " l2:" << l2_subopt << " l3:" << l3_subopt << " l4:" << l4_subopt << " alfa:" << alfa_subopt << " beita:" << beita_subopt << endl;
+			auto i = subopt->begin();
+			for (; i != subopt->end(); i++)
+			{
+				if (min > (*i)[0])
+				{
+					min_i = i;
+					min = (*i)[0];
+				}
+			}
 			result = true;
-			control->push_back(start_node.x); control->push_back(start_node.y);
-			control->push_back(x1_subopt); control->push_back(y1_subopt);
-			control->push_back(x2_subopt); control->push_back(y2_subopt);
-			control->push_back(x3_subopt); control->push_back(y3_subopt);
-			control->push_back(end_node.x); control->push_back(end_node.y);
 		}
 	}
+	control->push_back(start_node.x); control->push_back(start_node.y);
+	control->push_back((*min_i)[1]); control->push_back((*min_i)[2]);
+	control->push_back((*min_i)[3]); control->push_back((*min_i)[4]);
+	control->push_back((*min_i)[5]); control->push_back((*min_i)[6]);
+	control->push_back(end_node.x); control->push_back(end_node.y);
+	delete subopt, opt;
 	return result;
 }
 
-int Trajectory::is_force_extend_safe(const Vehicle::Node &startnode, const double &step, const vector<double> &control, Collision::collision *collimap, double *le, vector<Vehicle::Node> *path)
+int Trajectory::is_force_extend_safe(const Vehicle::Node &startnode, const double &step, const vector<double> &control, double *le, vector<Vehicle::Node> *path)
 {
 	ts::BSpline bspline = ts::BSpline(3, 2, control.size() - 1, TS_CLAMPED);
 	vector<ts::rational> ctrl_points = bspline.ctrlp();
@@ -1235,8 +1200,6 @@ int Trajectory::is_force_extend_safe(const Vehicle::Node &startnode, const doubl
 		ctrl_points[i + 3] = control[2 + i / 2];
 	}
 	bspline.setCtrlp(ctrl_points);  //在原控制点中插入中点生成所需要的B样条曲线
-	//std::ofstream outfile;
-	//outfile.open("E:\\postgraduate\\codes\\PLAN\\plan20161130\\validate\\attachment.txt");
 	int issafe = 2;
 	double du = 0.01;
 	double u = 0.;
@@ -1253,7 +1216,6 @@ int Trajectory::is_force_extend_safe(const Vehicle::Node &startnode, const doubl
 		diff_1.reset(result[0] - old_tmp[0], result[1] - old_tmp[1]);
 		diff_2.reset(diff_1.x - old_diff.x, diff_1.y - old_diff.y);
 		double theta = atan2(diff_1.y, diff_1.x);
-		//outfile << result[0] << "," << result[1] << "," << theta << endl;
 		s += sqrt(pow(result[0] - old_tmp[0], 2.) + pow(result[1] - old_tmp[1], 2.));
 		old_tmp[0] = result[0];          old_tmp[1] = result[1];
 		old_diff = diff_1;
@@ -1265,7 +1227,6 @@ int Trajectory::is_force_extend_safe(const Vehicle::Node &startnode, const doubl
 			break;
 		}
 		double k = (diff_1.x*diff_2.y - diff_2.x*diff_1.y) / pow(sqrt(pow(diff_1.x, 2.) + pow(diff_2.y, 2.)), 1.5);
-	//	old_node.reset(result[0], result[1], theta, k);
 
 		le_tmp += s;
 		s = 0;
@@ -1273,7 +1234,6 @@ int Trajectory::is_force_extend_safe(const Vehicle::Node &startnode, const doubl
 		if (count == time)
 		{
 			*le = le_tmp;
-			//path->emplace_back(old_node);
 			count = 0;
 		}
 	}
@@ -1284,7 +1244,7 @@ int Trajectory::is_force_extend_safe(const Vehicle::Node &startnode, const doubl
 	Vehicle::Node old_node(startnode);
 	for (int i = 2; i <= end_safe - 1; i += 2)
 	{
-		path->emplace_back(Vehicle::Node(ctrl_points[2 * i], ctrl_points[2 * i + 1], atan2(ctrl_points[2 * i + 1] - old_node.y, ctrl_points[2 * i] - old_node.x) + startnode.theta));
+		path->emplace_back(Vehicle::Node(ctrl_points[2 * i], ctrl_points[2 * i + 1], atan2(ctrl_points[2 * i + 1] - old_node.y, ctrl_points[2 * i] - old_node.x)/* + startnode.theta*/));
 		old_node = *path->rbegin();
 	}
 

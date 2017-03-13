@@ -93,7 +93,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>E:\library\Eigen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\library\eigen\Eigen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -134,21 +134,24 @@
     <ClInclude Include="..\_include\Environment.h" />
     <ClInclude Include="..\_include\Force_extend.h" />
     <ClInclude Include="..\_include\Parameters.h" />
+    <ClInclude Include="..\_include\Plan.h" />
     <ClInclude Include="..\_include\RRT.h" />
     <ClInclude Include="..\_include\tinyspline.h" />
     <ClInclude Include="..\_include\tinysplinecpp.h" />
     <ClInclude Include="..\_include\Trajectory.h" />
-    <ClInclude Include="..\_include\Vehicle.hpp" />
+    <ClInclude Include="..\_include\Vehicle.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\_source\Collision_check.cpp" />
     <ClCompile Include="..\_source\Environment.cpp" />
     <ClCompile Include="..\_source\Force_extend.cpp" />
     <ClCompile Include="..\_source\main.cpp" />
+    <ClCompile Include="..\_source\Plan.cpp" />
     <ClCompile Include="..\_source\RRT.cpp" />
     <ClCompile Include="..\_source\tinyspline.c" />
     <ClCompile Include="..\_source\tinysplinecpp.cpp" />
     <ClCompile Include="..\_source\Trajectory.cpp" />
+    <ClCompile Include="..\_source\Vehicle.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

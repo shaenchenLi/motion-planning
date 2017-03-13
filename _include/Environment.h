@@ -3,8 +3,8 @@
 
 #include <unordered_map>
 #include <vector>
-using std::unordered_map;
 using std::vector;
+using std::unordered_map;
 
 #include "Parameters.h"
 
@@ -18,8 +18,6 @@ namespace Environment
 
 	struct EnvironMap
 	{
-		//xy coordinates of all objects are relative to vehicle
-		
 		struct HashFunc
 		{
 			size_t operator()(const position &p) const
@@ -57,9 +55,12 @@ namespace Environment
 		}
 
 		void point_construct(const position &point);
+		void point_construct(const double &x, const double &y);
 		void vehicle_construct(const position &center, const position &shape);
 		void line_construct(const vector<position> &points); //the interval of points must equal to the map's interval
+		void line_construct(const position &start, const position &end);
 		void guard_construct(const vector<position> &points, const double &width);
+		void box_construct(const position &corner, const position &shape);
 		void reset();
 
 		//get data

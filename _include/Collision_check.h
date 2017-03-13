@@ -7,7 +7,7 @@
 using namespace cv;
 
 #include "Environment.h"
-#include "Vehicle.hpp"
+#include "Vehicle.h"
 
 namespace Collision
 {
@@ -19,17 +19,13 @@ namespace Collision
 		{
 			kernel = nullptr;
 			collision_map = nullptr;
+			space = SAFESTEP;
 		}
 		collision(Environment::EnvironMap *environmap)
 		{
-			interval = environmap->_interval();
-			kernel = _kernel(interval);
-			origin[0] = environmap->_range()->begin()->x;
-			origin[1] = environmap->_range()->begin()->y;
 			collision_map = nullptr;
 			_collision_map(environmap);
 			space = SAFESTEP;// depending on the length of the vehicle and the circle
-
 		}
 		~collision()
 		{
