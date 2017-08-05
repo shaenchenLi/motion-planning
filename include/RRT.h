@@ -3,10 +3,14 @@
 
 #include <algorithm>
 #include <ctime>
+//#include <fstream>
+//#include <iostream>
 #include <list>
 #include <math.h>
 #include <map>
 #include <random>
+#include <set>
+//#include <stdio.h>
 #include <vector>
 
 #include "Collision_check.h"
@@ -63,7 +67,7 @@ namespace RRT
 
 		~RRT_Node()
 		{
-			delete successor;
+			//delete successor;
 		}
 
 		void reset_node(double x, double y)
@@ -82,10 +86,21 @@ namespace RRT
 			right = r.right;
 			kd_father = r.kd_father;
 			deep = r.deep;
-			vector<Index>().swap(*successor);
-			cout << "successor has been swapped" << endl;
-			for (auto i : *r.successor)
-				successor->emplace_back(i);
+			if (successor->size() > 0)
+				vector<Index>().swap(*successor);
+			//cout << "successor has been swapped" << endl;
+			if (!r.successor->empty())
+			{
+				for (auto i : *r.successor)
+					successor->emplace_back(i);
+			}
+		}
+		void reset(const Vehicle::Node &n)
+		{
+			node.reset(n);
+			index = predecessor = left = right = kd_father = -1;
+			deep = 0;
+			successor = new vector<Index>;
 		}
 
 		//getdata
@@ -123,12 +138,13 @@ namespace RRT
 				step = RRTSTEP_l;
 			else
 				step = RRTSTEP_s;
-			root = new RRT_Node(xi, 0, 0);
+			//root = new RRT_Node(xi, 0, 0);
 			dest = new RRT_Node(xg, -1, -1);
-			tree = new vector<RRT_Node>;
+			tree = new vector<RRT_Node>({ RRT_Node(xi, 0, 0) });
 			route_tree = new vector<Vehicle::Node>;
-			tree->emplace_back(root);
-			motion = new vector<Trajectory::State>;
+			//tree->reserve(max_size + 1);
+			//tree->emplace_back(root);
+			//motion = new vector<Trajectory::State>;
 		}
 		RTG_RRT(Trajectory::State state_i, Trajectory::State state_g, const int f = 1) :flag(f), max_iter(MAXITER_1)
 		{
@@ -136,27 +152,29 @@ namespace RRT
 				step = RRTSTEP_l;
 			else
 				step = RRTSTEP_s;
-			root = new RRT_Node(state_i, 0, 0);
+			//root = new RRT_Node(state_i, 0, 0);
 			dest = new RRT_Node(state_g, -1, -1);
-			tree = new vector<RRT_Node>;
+			tree = new vector<RRT_Node>({ RRT_Node(state_i, 0, 0) });
 			route_tree = new vector<Vehicle::Node>;
-			tree->emplace_back(root);
-			motion = new vector<Trajectory::State>;
+			//tree->reserve(max_size + 1);
+			//tree->emplace_back(root);
+			//motion = new vector<Trajectory::State>;
 		}
 		RTG_RRT(const RTG_RRT &r) :step(r.step), flag(r.flag), max_iter(r.max_iter)
 		{
-			root = new RRT_Node(*r._root());
+			//root = new RRT_Node(*r._root());
 			dest = new RRT_Node(*r._dest());
-			motion = new vector<Trajectory::State>(*r._motion());
+			//motion = new vector<Trajectory::State>(*r._motion());
 			tree = new vector<RRT_Node>(*r._tree());
 			route_tree = new vector<Vehicle::Node>(*r._route_tree());
 		}
 		RTG_RRT() :RTG_RRT(Vehicle::Node(), Vehicle::Node(), 0) {}
 		~RTG_RRT()
 		{
-			delete root;
+			//cout << root->_node()->x << " " << root->_node()->y << endl;
+			//cout << dest->_node()->x << " " << dest->_node()->y << endl;			
 			delete dest;
-			delete motion;
+			//delete motion;
 		}
 
 		// NN_search
@@ -169,45 +187,45 @@ namespace RRT
 		// random select
 		void _lambda_ss(double *lambda, const int &num, const double le = 0.); //le=0:unextendable  le!=0:extendable
 		void rand_normal(const int &iter, Vehicle::Node *rand_node);
-		void rand_gaussian(const int &iter, vector<double> *gaus_para, Point2D *refer_point, Vehicle::Node *rand_node);
+		void rand_gaussian(const int &iter, vector<double> *gaus_para, position<double> *refer_point, Vehicle::Node *rand_node);
 		void gaussian_para(const int &type, vector<double> *gaus_para);
-		void gaussian_para_turn(const double &l, const int &i, vector<double> *gaus_para, Point2D *refer_point);
-		void gaussian_para_Uturn(const double &l, const int &i, vector<double> *gaus_para, Point2D *refer_point);
+		void gaussian_para_turn(const double &l, const int &i, vector<double> *gaus_para, position<double> *refer_point);
+		void gaussian_para_Uturn(const double &l, const int &i, vector<double> *gaus_para, position<double> *refer_point);
 
 		// template path generate
-		int force_extend(const int &type, double *le);//2:success 1:partially extension 0:failure
-		int force_extend(const int &type, const double &l, const double &w, double *le);
+		int force_extend(const int &type, double *le, const double l_v_theta = 0.);//2:success 1:partially extension 0:failure
+		int force_extend(const int &type, const vector<double> &c, double *le, const double l_v_theta = 0.);
 		void path2tree(const Index &predecessor, vector<Vehicle::Node> *path);
 
 		// grow of tree
 		int grow(Vehicle::Node *new_node); //2:success 1:partially extension 0:failure
-		int search(const int &type, const double l = 0., const double w = 0.); 
-		int search_count(const int &type, int *count, const double l = 0., const double w = 0.); 
-
+		int search(const int &type, const vector<double> constraint = { 0 }, const double l_v_theta = 0.);
+		
 		// get final path 
 		void getpath();
 		void getpath(const Index &end);
 
-		void _motion(const vector<Trajectory::State> &t);
+		//void _motion(const vector<Trajectory::State> &t);
 		void reset(const Index &new_root);
+		void reset(const Trajectory::State &s);
+		void reset(Trajectory::State state_i, Trajectory::State state_g, const int f = 1);
 		void _copy(const RTG_RRT &copied_tree);
 		
 		vector<RRT_Node>* _tree() const { return tree; }
 		vector<Vehicle::Node>* _route_tree() const { return route_tree; }
-		RRT_Node* _root() const { return root; }
 		RRT_Node* _dest() const { return dest; }
-		vector<Trajectory::State>* _motion() const
-		{ return motion; }
+		//vector<Trajectory::State>* _motion() const { return motion; }
 
 		int max_iter;
 
 	private:
-		RRT_Node *root, *dest;
+		Vehicle::Node root_global;
+		RRT_Node *dest;
 		vector<RRT_Node>* tree;
 		vector<Vehicle::Node>* route_tree;
 		double step;
 		int flag; //flag=0:basic RRT; flag=1:RTG_RRT  真正使用时可省略
-		vector<Trajectory::State> *motion;//仿真画图方便，实际不用
+		//vector<Trajectory::State> *motion;//仿真画图方便，实际不用
 	};
 }
 

@@ -15,66 +15,93 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\_include\Collision_check.h">
+    <ClInclude Include="..\include\Collision_check.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\Environment.h">
+    <ClInclude Include="..\include\Configuration.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\Force_extend.h">
+    <ClInclude Include="..\include\Dynamic_vel_plan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\Parameters.h">
+    <ClInclude Include="..\include\Environment.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\RRT.h">
+    <ClInclude Include="..\include\Force_extend.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\tinyspline.h">
+    <ClInclude Include="..\include\Plan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\tinysplinecpp.h">
+    <ClInclude Include="..\include\rapidxml.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\Trajectory.h">
+    <ClInclude Include="..\include\rapidxml_iterators.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\Plan.h">
+    <ClInclude Include="..\include\rapidxml_print.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\_include\Vehicle.h">
+    <ClInclude Include="..\include\rapidxml_utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\RRT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\show.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\tinyspline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\tinysplinecpp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Trajectory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Vehicle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\_source\Collision_check.cpp">
+    <ClCompile Include="..\source\Collision_check.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\Environment.cpp">
+    <ClCompile Include="..\source\Configuration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\Force_extend.cpp">
+    <ClCompile Include="..\source\Dynamic_vel_plan.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\main.cpp">
+    <ClCompile Include="..\source\Environment.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\RRT.cpp">
+    <ClCompile Include="..\source\Force_extend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\tinyspline.c">
+    <ClCompile Include="..\source\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\tinysplinecpp.cpp">
+    <ClCompile Include="..\source\Plan.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\Trajectory.cpp">
+    <ClCompile Include="..\source\RRT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\Plan.cpp">
+    <ClCompile Include="..\source\show.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\_source\Vehicle.cpp">
+    <ClCompile Include="..\source\tinyspline.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\tinysplinecpp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\Trajectory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\Vehicle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
